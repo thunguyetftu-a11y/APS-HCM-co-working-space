@@ -1,41 +1,112 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-
 import { TaskComposer } from "@/components/TaskComposer";
 import {
   calendarEvents,
-  initialTasks,
   milestones,
   quickStats,
-  teamMembers,
   type Task,
 } from "@/data/mockData";
-import { readStoredTasks, writeStoredTasks } from "@/lib/plannerStorage";
+import {
+  getTeamMembers,
+  readSignedInUser,
+  readStoredProjects,
+  readStoredTasks,
+  writeStoredProjects,
+  writeStoredTasks,
+} from "@/lib/plannerStorage";
 
-type Status = "Backlog" | "In Progress" | "Review" | "Done";
+type Status = "Open" | "In Progress" | "Review" | "Done";
 
-const columns: Status[] = ["Backlog", "In Progress", "Review", "Done"];
+const columns: Status[] = ["Open", "In Progress", "Review", "Done"];
 
 export default function HomePage() {
   const [selectedProject, setSelectedProject] = useState<string>("All Projects");
   const [selectedUser, setSelectedUser] = useState<string>("All Team");
+  const [calendarMode, setCalendarMode] = useState<"calendar" | "list">("calendar");
+  const [projects, setProjects] = useState<string[]>([]);
+  const [taskList, setTaskList] = useState<Task[]>([]);
   const [isComposerOpen, setComposerOpen] = useState(false);
-  const [taskList, setTaskList] = useState<Task[]>(initialTasks);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [commentText, setCommentText] = useState("");
+
+  const signedInUser = readSignedInUser();
 
   useEffect(() => {
-    const storedTasks = readStoredTasks();
-    if (storedTasks.length > 0) {
-      setTaskList(storedTasks);
-    }
+    const savedProjects = readStoredProjects();
+    const savedTasks = readStoredTasks();
+    setProjects(savedProjects.map((project) => project.name));
+    setTaskList(savedTasks.length ? savedTasks : []);
   }, []);
 
   useEffect(() => {
     writeStoredTasks(taskList);
   }, [taskList]);
 
+  useEffect(() => {
+    if (projects.length) {
+      writeStoredProjects(projects.map((name, index) => ({ id: String(index), name })));
+    }
+  }, [projects]);
+
   function handleCreateTask(task: Task) {
     setTaskList((current) => [task, ...current]);
+  }
+
+  function handleSaveTask(task: Task) {
+    setTaskList((current) => {
+      const idx = current.findIndex((item) => item.id === task.id);
+      if (idx >= 0) {
+        return current.map((item) => (item.id === task.id ? task : item));
+      }
+      return [task, ...current];
+    });
+  }
+
+  function handleCommentSubmit(taskId: number) {
+    const text = commentText.trim();
+    if (!text) return;
+
+    const nextTaskList = taskList.map((item) => {
+      if (item.id !== taskId) return item;
+
+      const mentions = text.match(/@([A-Za-z0-9_.-]+)/g) ?? [];
+      const names = mentions.map((mention) => mention.slice(1));
+      const currentUser = signedInUser?.name ?? "Guest";
+
+      return {
+        ...item,
+        comments: [
+          ...(item.comments ?? []),
+          {
+            id: Date.now(),
+            author: currentUser,
+            message: text,
+            createdAt: new Date().toISOString(),
+            mentions: names,
+          },
+        ],
+      };
+    });
+
+    setTaskList(nextTaskList);
+    setCommentText("");
+  }
+
+  function openTaskForEdit(task: Task) {
+    setSelectedTask(task);
+    setEditingTask(task);
+    setComposerOpen(true);
+  }
+
+  function handleDoneToggle(task: Task) {
+    const nextTask = {
+      ...task,
+      status: task.status === "Done" ? "Open" : "Done",
+    };
+    setTaskList((current) => current.map((item) => item.id === task.id ? nextTask : item));
   }
 
   const filteredTasks = useMemo(() => {
@@ -56,6 +127,8 @@ export default function HomePage() {
     );
   }, [filteredTasks]);
 
+  const teamNames = useMemo(() => getTeamMembers(), []);
+
   return (
     <>
       <main className="page-shell">
@@ -69,38 +142,34 @@ export default function HomePage() {
           </div>
 
           <nav className="nav-menu">
-            <a className="nav-item active" href="/">
-              Overview
-            </a>
-            <a className="nav-item" href="/projects">
-              Projects
-            </a>
-            <a className="nav-item" href="/calendar">
-              Calendar
-            </a>
-            <a className="nav-item" href="/tasks">
-              Tasks
-            </a>
-            <a className="nav-item" href="/reports">
-              Reports
-            </a>
-            <a className="nav-item" href="/settings">
-              Settings
-            </a>
+            <a className="nav-item active" href="/">Overview</a>
+            <a className="nav-item" href="/projects">Projects</a>
+            <a className="nav-item" href="/calendar">Calendar</a>
+            <a className="nav-item" href="/tasks">Tasks</a>
+            <a className="nav-item" href="/reports">Reports</a>
+            <a className="nav-item" href="/settings">Settings</a>
           </nav>
 
           <div className="sidebar-card">
             <p className="eyebrow">Team members</p>
             <div className="member-stack">
-              {teamMembers.map((member) => (
-                <div className="member-item" key={member.name}>
-                  <div className="avatar" style={{ background: member.color }}>{member.name[0]}</div>
+              {teamNames.length ? (
+                teamNames.map((member) => (
+                  <div className="member-item" key={member.name}>
+                    <div className="avatar" style={{ background: "#6aa8ff" }}>{member[0]}</div>
+                    <div>
+                      <strong>{member}</strong>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="member-item">
+                  <div className="avatar" style={{ background: "#6aa8ff" }}>?</div>
                   <div>
-                    <strong>{member.name}</strong>
-                    <span>{member.role}</span>
+                    <strong>No team members yet</strong>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         </aside>
@@ -112,28 +181,37 @@ export default function HomePage() {
               <h1>Product Launch Sprint</h1>
             </div>
             <div className="topbar-actions">
-              <button className="secondary-button" type="button">
-                Share
-              </button>
-              <button className="primary-button" type="button" onClick={() => setComposerOpen(true)}>
+              <button className="secondary-button" type="button">Share</button>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => setComposerOpen(true)}
+              >
                 New Task
               </button>
             </div>
           </header>
 
           <div className="filters-row">
-            <select value={selectedProject} onChange={(event) => setSelectedProject(event.target.value)}>
+            <select
+              value={selectedProject}
+              onChange={(event) => setSelectedProject(event.target.value)}
+            >
               <option>All Projects</option>
-              <option>Website Redesign</option>
-              <option>Marketing Launch</option>
-              <option>Operations</option>
+              {projects.length ? (
+                projects.map((project) => (
+                  <option key={project} value={project}>
+                    {project}
+                  </option>
+                ))
+              ) : null}
             </select>
 
             <select value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)}>
               <option>All Team</option>
-              {teamMembers.map((member) => (
-                <option key={member.name} value={member.name}>
-                  {member.name}
+              {teamNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
                 </option>
               ))}
             </select>
@@ -160,7 +238,7 @@ export default function HomePage() {
 
               <div className="board-columns">
                 {columns.map((column) => (
-                  <div className="board-column" key={column}>
+                  <div className="board-column" key={column} key={column}>
                     <div className="column-header">
                       <span>{column}</span>
                       <span className="count-pill">{board[column].length}</span>
@@ -168,7 +246,18 @@ export default function HomePage() {
 
                     <div className="task-list">
                       {board[column].map((task) => (
-                        <article className="task-card" key={task.id}>
+                        <article
+                          key={task.id}
+                          className="task-card"
+                          onClick={() => openTaskForEdit(task)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              openTaskForEdit(task);
+                            }
+                          }}
+                        >
                           <div className="task-topline">
                             <span className={`priority priority-${task.priority.toLowerCase()}`}>
                               {task.priority}
@@ -180,19 +269,28 @@ export default function HomePage() {
                           <p>{task.description}</p>
 
                           <div className="meta-row">
-                            <span>{task.deadline}</span>
-                            <span>{task.progress}%</span>
-                          </div>
-
-                          <div className="progress-track">
-                            <div className="progress-fill" style={{ width: `${task.progress}%` }} />
+                            <span>{task.startDate || "No start date"}</span>
+                            <span>{task.dueDate || "No due date"}</span>
                           </div>
 
                           <div className="task-footer">
-                            <div className="avatar-mini" style={{ background: task.assigneeColor }}>
-                              {task.assignee[0]}
+                            <div className="avatar-mini" style={{ background: task.assigneeColor || "#6aa8ff" }}>
+                              {task.assignee ? task.assignee[0] : "?"}
                             </div>
-                            <span>{task.assignee}</span>
+                            <span>{task.assignee || "Unassigned"}</span>
+                          </div>
+
+                          <div className="task-actions-inline">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDoneToggle(task);
+                              }}
+                              className={`mini-button ${task.status === "Done" ? "done" : ""}`}
+                            >
+                              {task.status === "Done" ? "Re-open" : "Done"}
+                            </button>
                           </div>
                         </article>
                       ))}
@@ -206,19 +304,48 @@ export default function HomePage() {
               <div className="panel-box">
                 <div className="section-header">
                   <h3>Calendar</h3>
-                  <span>Week view</span>
+                  <div className="calendar-toggle">
+                    <button
+                      type="button"
+                      className={calendarMode === "calendar" ? "active" : ""}
+                      onClick={() => setCalendarMode("calendar")}
+                    >
+                      Calendar
+                    </button>
+                    <button
+                      type="button"
+                      className={calendarMode === "list" ? "active" : ""}
+                      onClick={() => setCalendarMode("list")}
+                    >
+                      List
+                    </button>
+                  </div>
                 </div>
 
-                <div className="calendar-grid">
-                  {Array.from({ length: 7 }).map((_, index) => (
-                    <div className="day-cell" key={index}>
-                      <small>{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index]}</small>
-                      <strong>{index + 14}</strong>
-                      {index === 1 && <span className="calendar-dot active" />}
-                      {index === 4 && <span className="calendar-dot" />}
-                    </div>
-                  ))}
-                </div>
+                {calendarMode === "calendar" ? (
+                  <div className="calendar-grid">
+                    {Array.from({ length: 7 }).map((_, index) => (
+                      <div className="day-cell" key={index}>
+                        <small>{["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index]}</small>
+                        <strong>{index + 14}</strong>
+                        {index === 1 && <span className="calendar-dot active" />}
+                        {index === 4 && <span className="calendar-dot" />}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="calendar-list">
+                    {calendarEvents.map((event) => (
+                      <div className="event-item" key={event.title}>
+                        <div className="event-time">{event.time}</div>
+                        <div>
+                          <strong>{event.title}</strong>
+                          <p>{event.type}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="panel-box">
@@ -259,11 +386,135 @@ export default function HomePage() {
         </section>
       </main>
 
+      {selectedTask && (
+        <div className="modal-backdrop">
+          <div className="task-detail-panel">
+            <div className="task-detail-header">
+              <div>
+                <h3>{selectedTask.title}</h3>
+                <p>{selectedTask.project}</p>
+              </div>
+              <button
+                type="button"
+                className="ghost-button"
+                onClick={() => setSelectedTask(null)}
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="task-detail-body">
+              <div className="task-detail-main">
+                <div className="task-detail-block">
+                  <h4>Overview</h4>
+                  <p>{selectedTask.description}</p>
+                </div>
+
+                <div className="task-detail-block">
+                  <h4>Details</h4>
+                  <ul>
+                    <li>Owner: {selectedTask.assignee || "Unassigned"}</li>
+                    <li>Project: {selectedTask.project}</li>
+                    <li>Start: {selectedTask.startDate || "Not set"}</li>
+                    <li>Due: {selectedTask.dueDate || "Not set"}</li>
+                    <li>Status: {selectedTask.status}</li>
+                  </ul>
+                </div>
+
+                <div className="task-detail-block">
+                  <h4>Attachments</h4>
+                  <div className="attachment-list">
+                    {selectedTask.attachments?.length ? (
+                      selectedTask.attachments.map((attachment) => (
+                        <div key={attachment.id} className="attachment-item">
+                          <span>{attachment.name}</span>
+                          <span className="small-tag">{attachment.type}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="muted">No attachments</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="task-detail-block">
+                  <h4>Comments</h4>
+                  <div className="task-comments">
+                    {selectedTask.comments?.length ? (
+                      selectedTask.comments.map((comment) => (
+                        <div key={comment.id} className="comment-item">
+                          <strong>{comment.author}</strong>
+                          <p>{comment.message}</p>
+                          <div className="comment-meta">
+                            <span>{comment.createdAt}</span>
+                            <span>{comment.mentions.length ? `@${comment.mentions.join(", @")}` : ""}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="muted">No comments yet</span>
+                    )}
+                  </div>
+
+                  <div className="comment-box">
+                    <textarea
+                      value={commentText}
+                      onChange={(event) => setCommentText(event.target.value)}
+                      placeholder="Write a comment and mention someone like @Mila"
+                    />
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={() => handleCommentSubmit(selectedTask.id)}
+                    >
+                      Post comment
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="task-detail-sidebar">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    setSelectedTask(null);
+                    setEditingTask(selectedTask);
+                    setComposerOpen(true);
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => handleDoneToggle(selectedTask)}
+                >
+                  {selectedTask.status === "Done" ? "Re-open" : "Done"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <TaskComposer
         isOpen={isComposerOpen}
-        onClose={() => setComposerOpen(false)}
+        initialTask={editingTask ?? undefined}
+        mode={editingTask ? "edit" : "create"}
+        onClose={() => {
+          setComposerOpen(false);
+          setEditingTask(null);
+        }}
         onCreate={(task) => {
-          setTaskList((current) => [task, ...current]);
+          if (editingTask) {
+            handleSaveTask(task);
+          } else {
+            handleCreateTask(task);
+          }
+          setSelectedTask(task);
+          setComposerOpen(false);
+          setEditingTask(null);
         }}
       />
     </>
