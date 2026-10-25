@@ -13,15 +13,18 @@ export type TaskAttachment = {
   url: string;
 };
 
+export type TaskStatus = "Open" | "In Progress" | "Review" | "Done";
+export type TaskPriority = "High" | "Medium" | "Low";
+
 export type Task = {
   id: number;
   title: string;
   description: string;
-  status: "Open" | "In Progress" | "Review" | "Done";
+  status: TaskStatus;
   project: string;
   assignee: string;
   assigneeColor: string;
-  priority: "High" | "Medium" | "Low";
+  priority: TaskPriority;
   startDate: string;
   dueDate: string;
   attachments: TaskAttachment[];
@@ -42,11 +45,7 @@ export const teamMembers = [
   { name: "Sam", role: "Developer", color: "#9b62ff" },
 ];
 
-export const defaultProjects = [
-  "General",
-  "Client Work",
-  "Operations",
-];
+export const defaultProjects = ["General", "Client Work", "Operations"];
 
 export const tasks: Task[] = [
   {
