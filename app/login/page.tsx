@@ -4,14 +4,18 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
 
-import { readStoredAccounts, writeStoredAccounts } from "@/lib/plannerStorage";
+import { readStoredAccounts, writeStoredAccounts, writeSignedInUser } from "@/lib/plannerStorage";
 
 export default function LoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [status, setStatus] = useState<{ type: "error" | "success"; message: string } | null>(null);
 
-  const pageTitle = useMemo(() => (mode === "signin" ? "Welcome back" : "Create your account"), [mode]);
+  const pageTitle = useMemo(
+    () => (mode === "signin" ? "Welcome back" : "Create your account"),
+    [mode]
+  );
+
   const pageText = useMemo(
     () =>
       mode === "signin"
@@ -50,7 +54,10 @@ export default function LoginPage() {
       ];
 
       writeStoredAccounts(nextAccounts);
-      setStatus({ type: "success", message: "Account created successfully. You can now sign in." });
+      setStatus({
+        type: "success",
+        message: "Account created successfully. You can now sign in.",
+      });
       setForm({ name: "", email: "", password: "" });
       setMode("signin");
       return;
@@ -64,13 +71,19 @@ export default function LoginPage() {
     const accounts = readStoredAccounts();
     const match = accounts.find(
       (account) =>
-        account.email.toLowerCase() === form.email.toLowerCase() && account.password === form.password
+        account.email.toLowerCase() === form.email.toLowerCase() &&
+        account.password === form.password
     );
 
     if (!match) {
       setStatus({ type: "error", message: "No matching account was found. Create an account first." });
       return;
     }
+
+    writeSignedInUser({
+      name: match.name,
+      email: match.email,
+    });
 
     setStatus({
       type: "success",
