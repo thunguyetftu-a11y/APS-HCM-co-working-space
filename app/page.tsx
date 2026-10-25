@@ -2,12 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { TaskComposer } from "@/components/TaskComposer";
-import {
-  calendarEvents,
-  milestones,
-  quickStats,
-  type Task,
-} from "@/data/mockData";
+import { calendarEvents, milestones, quickStats, type Task } from "@/data/mockData";
 import {
   getTeamMembers,
   readSignedInUser,
@@ -37,6 +32,7 @@ export default function HomePage() {
   useEffect(() => {
     const savedProjects = readStoredProjects();
     const savedTasks = readStoredTasks();
+
     setProjects(savedProjects.map((project) => project.name));
     setTaskList(savedTasks.length ? savedTasks : []);
   }, []);
@@ -155,7 +151,7 @@ export default function HomePage() {
             <div className="member-stack">
               {teamNames.length ? (
                 teamNames.map((member) => (
-                  <div className="member-item" key={member.name}>
+                  <div className="member-item" key={member}>
                     <div className="avatar" style={{ background: "#6aa8ff" }}>{member[0]}</div>
                     <div>
                       <strong>{member}</strong>
@@ -207,7 +203,10 @@ export default function HomePage() {
               ) : null}
             </select>
 
-            <select value={selectedUser} onChange={(event) => setSelectedUser(event.target.value)}>
+            <select
+              value={selectedUser}
+              onChange={(event) => setSelectedUser(event.target.value)}
+            >
               <option>All Team</option>
               {teamNames.map((name) => (
                 <option key={name} value={name}>
@@ -238,7 +237,7 @@ export default function HomePage() {
 
               <div className="board-columns">
                 {columns.map((column) => (
-                  <div className="board-column" key={column} key={column}>
+                  <div className="board-column" key={column}>
                     <div className="column-header">
                       <span>{column}</span>
                       <span className="count-pill">{board[column].length}</span>
@@ -274,7 +273,10 @@ export default function HomePage() {
                           </div>
 
                           <div className="task-footer">
-                            <div className="avatar-mini" style={{ background: task.assigneeColor || "#6aa8ff" }}>
+                            <div
+                              className="avatar-mini"
+                              style={{ background: task.assigneeColor || "#6aa8ff" }}
+                            >
                               {task.assignee ? task.assignee[0] : "?"}
                             </div>
                             <span>{task.assignee || "Unassigned"}</span>
