@@ -1,87 +1,155 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import type { FormEvent } from "react";
 
-import { AppShell } from "@/components/AppShell";
-import { TaskComposer } from "@/components/TaskComposer";
-import { initialTasks, type Task } from "@/data/mockData";
-import { readStoredTasks, writeStoredTasks } from "@/lib/plannerStorage";
+import { readStoredAccounts, writeStoredAccounts } from "@/lib/plannerStorage";
 
-export default function TasksPage() {
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [isComposerOpen, setComposerOpen] = useState(false);
+export default function LoginPage() {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [status, setStatus] = useState<{ type: "error" | "success"; message: string } | null>(null);
 
-  useEffect(() => {
-    const storedTasks = readStoredTasks();
-    if (storedTasks.length > 0) {
-      setTasks(storedTasks);
+  const pageTitle = useMemo(() => (mode === "signin" ? "Welcome back" : "Create your account"), [mode]);
+  const pageText = useMemo(
+    () =>
+      mode === "signin"
+        ? "Sign in to continue planning work and sharing calendars."
+        : "Set up a TeamFlow workspace for your team.",
+    [mode]
+  );
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (mode === "signup") {
+      if (!form.name.trim() || !form.email.trim() || !form.password.trim()) {
+        setStatus({ type: "error", message: "Please complete all fields before creating an account." });
+        return;
+      }
+
+      const existingAccounts = readStoredAccounts();
+      const alreadyExists = existingAccounts.some(
+        (account) => account.email.toLowerCase() === form.email.toLowerCase()
+      );
+
+      if (alreadyExists) {
+        setStatus({ type: "error", message: "That email address is already in use." });
+        return;
+      }
+
+      const nextAccounts = [
+        ...existingAccounts,
+        {
+          name: form.name.trim(),
+          email: form.email.trim(),
+          password: form.password,
+          createdAt: new Date().toISOString(),
+        },
+      ];
+
+      writeStoredAccounts(nextAccounts);
+      setStatus({ type: "success", message: "Account created successfully. You can now sign in." });
+      setForm({ name: "", email: "", password: "" });
+      setMode("signin");
+      return;
     }
-  }, []);
 
-  useEffect(() => {
-    writeStoredTasks(tasks);
-  }, [tasks]);
+    if (!form.email.trim() || !form.password.trim()) {
+      setStatus({ type: "error", message: "Enter your email and password to continue." });
+      return;
+    }
 
-  function handleCreateTask(task: Task) {
-    setTasks((current) => [task, ...current]);
+    const accounts = readStoredAccounts();
+    const match = accounts.find(
+      (account) =>
+        account.email.toLowerCase() === form.email.toLowerCase() && account.password === form.password
+    );
+
+    if (!match) {
+      setStatus({ type: "error", message: "No matching account was found. Create an account first." });
+      return;
+    }
+
+    setStatus({
+      type: "success",
+      message: `Welcome back, ${match.name}! Redirecting to your dashboard...`,
+    });
+
+    window.setTimeout(() => {
+      window.location.href = "/";
+    }, 300);
   }
 
   return (
-    <>
-      <AppShell title="Tasks" subtitle="All team work items">
-        <div className="panel-box full-width">
-          <div className="section-header">
-            <h3>Task overview</h3>
-            <div className="header-actions">
-              <span>{tasks.length} items</span>
-              <button type="button" className="primary-button" onClick={() => setComposerOpen(true)}>Create task</button>
-            </div>
-          </div>
-
-          <div className="task-table-wrap">
-            <table className="task-table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Project</th>
-                  <th>Owner</th>
-                  <th>Status</th>
-                  <th>Due</th>
-                  <th>Progress</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map((task) => (
-                  <tr key={task.id}>
-                    <td>{task.title}</td>
-                    <td>{task.project}</td>
-                    <td>
-                      <div className="owner-cell">
-                        <span className="avatar-mini" style={{ background: task.assigneeColor }}>{task.assignee[0]}</span>
-                        {task.assignee}
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`status-badge ${task.status.toLowerCase().replace(/\s+/g, "-")}`}>{task.status}</span>
-                    </td>
-                    <td>{task.deadline}</td>
-                    <td>
-                      <div className="compact-progress">
-                        <span>{task.progress}%</span>
-                        <div className="progress-track small-track">
-                          <div className="progress-fill" style={{ width: `${task.progress}%` }} />
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    <main className="auth-shell">
+      <div className="auth-card">
+        <div className="brand-row auth-brand">
+          <div className="brand-mark">T</div>
+          <div>
+            <p className="eyebrow">Workspace</p>
+            <h2>TeamFlow</h2>
           </div>
         </div>
-      </AppShell>
 
-      <TaskComposer isOpen={isComposerOpen} onClose={() => setComposerOpen(false)} onCreate={handleCreateTask} />
-    </>
+        <h1>{pageTitle}</h1>
+        <p className="auth-subtext">{pageText}</p>
+
+        <form className="auth-form" onSubmit={handleSubmit}>
+          {mode === "signup" && (
+            <label>
+              Full name
+              <input
+                type="text"
+                placeholder="Jordan Lee"
+                value={form.name}
+                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+              />
+            </label>
+          )}
+
+          <label>
+            Email
+            <input
+              type="email"
+              placeholder="name@company.com"
+              value={form.email}
+              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+            />
+          </label>
+
+          <label>
+            Password
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={form.password}
+              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+            />
+          </label>
+
+          <button type="submit" className="primary-button auth-button">
+            {mode === "signin" ? "Sign in" : "Create account"}
+          </button>
+        </form>
+
+        {status && <p className={`auth-status ${status.type}`}>{status.message}</p>}
+
+        <div className="auth-links">
+          <Link href="/">Back to dashboard</Link>
+          <button
+            type="button"
+            className="text-button"
+            onClick={() => {
+              setMode((current) => (current === "signin" ? "signup" : "signin"));
+              setStatus(null);
+            }}
+          >
+            {mode === "signin" ? "Create account" : "Sign in"}
+          </button>
+        </div>
+      </div>
+    </main>
   );
 }
