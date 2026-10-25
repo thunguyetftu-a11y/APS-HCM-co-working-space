@@ -1,8 +1,10 @@
-'use client';
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+
+import { readSignedInUser, writeSignedInUser } from "@/lib/plannerStorage";
 
 const navItems = [
   { label: "Overview", href: "/" },
@@ -23,6 +25,12 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const user = readSignedInUser();
+
+  function handleLogout() {
+    writeSignedInUser(null);
+    window.location.href = "/";
+  }
 
   return (
     <div className="page-shell">
@@ -49,15 +57,23 @@ export function AppShell({
         <div className="sidebar-card">
           <p className="eyebrow">Team members</p>
           <div className="member-stack">
-            {[{ name: "Alicia", role: "Product Lead" }, { name: "Harold", role: "Design" }, { name: "Mila", role: "PM" }, { name: "Sam", role: "Developer" }].map((member) => (
-              <div className="member-item" key={member.name}>
-                <div className="avatar" style={{ background: "#4d8cff" }}>{member.name[0]}</div>
-                <div>
-                  <strong>{member.name}</strong>
-                  <span>{member.role}</span>
-                </div>
-              </div>
-            ))}
+            {readSignedInUser()
+              ? [
+                  {
+                    name: readSignedInUser()!.name,
+                    role: "Owner",
+                    color: "#6aa8ff",
+                  },
+                ].map((member) => (
+                  <div className="member-item" key={member.name}>
+                    <div className="avatar" style={{ background: member.color }}>{member.name[0]}</div>
+                    <div>
+                      <strong>{member.name}</strong>
+                      <span>{member.role}</span>
+                    </div>
+                  </div>
+                ))
+              : null}
           </div>
         </div>
       </aside>
@@ -69,8 +85,18 @@ export function AppShell({
             <h1>{title}</h1>
           </div>
           <div className="topbar-actions">
-            <button className="secondary-button" type="button">Share</button>
-            <Link href="/login" className="primary-button top-link-button">Sign in</Link>
+            {user ? (
+              <>
+                <span className="user-pill">{user.name}</span>
+                <button type="button" className="secondary-button" onClick={handleLogout}>
+                  Log out
+                </button>
+              </>
+            ) : (
+              <Link href="/login" className="primary-button top-link-button">
+                Sign in
+              </Link>
+            )}
           </div>
         </header>
 
