@@ -8,6 +8,13 @@ import { type Task, type TaskAttachment } from "@/data/mockData";
 
 const projectOptions = ["General", "Client Work", "Operations"];
 
+const memberColors: Record<string, string> = {
+  Alicia: "#4d8cff",
+  Harold: "#26b98a",
+  Mila: "#f28e2b",
+  Sam: "#9b62ff",
+};
+
 const buildEmptyDraft = () => ({
   title: "",
   description: "",
@@ -40,6 +47,7 @@ export function TaskComposer({
   useEffect(() => {
     const names = getTeamMembers();
     setTeamMembers(names);
+
     if (isOpen) {
       setDraft(
         initialTask
@@ -62,6 +70,7 @@ export function TaskComposer({
 
     const selected = Array.from(files).slice(0, 2).map((file) => {
       const url = URL.createObjectURL(file);
+
       return {
         id: Date.now() + Math.random(),
         name: file.name,
@@ -85,9 +94,7 @@ export function TaskComposer({
       title: draft.title.trim(),
       description: draft.description.trim() || "No description provided yet.",
       assignee: draft.assignee || "Unassigned",
-      assigneeColor:
-        teamMembers.find((person) => person.name === draft.assignee)?.color ??
-        "#6aa8ff",
+      assigneeColor: memberColors[draft.assignee] || "#6aa8ff",
       priority: draft.priority,
       startDate: draft.startDate,
       dueDate: draft.dueDate,
