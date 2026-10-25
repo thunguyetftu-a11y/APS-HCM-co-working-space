@@ -1,64 +1,101 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 
-import { teamMembers, type Task } from "@/data/mockData";
+import { getTeamMembers } from "@/lib/plannerStorage";
+import { type Task, type TaskAttachment } from "@/data/mockData";
 
-const projectOptions = ["Website Redesign", "Marketing Launch", "Operations"];
+const projectOptions = ["General", "Client Work", "Operations"];
 
 const buildEmptyDraft = () => ({
   title: "",
   description: "",
-  status: "Backlog" as Task["status"],
-  project: "Website Redesign",
-  assignee: "Alicia",
+  status: "Open" as Task["status"],
+  project: "General",
+  assignee: "",
   priority: "Medium" as Task["priority"],
-  deadline: "Nov 30",
-  progress: 0,
+  startDate: "",
+  dueDate: "",
+  attachments: [] as TaskAttachment[],
+  comments: [] as Task["comments"],
 });
 
 export function TaskComposer({
   isOpen,
   onClose,
   onCreate,
+  initialTask,
+  mode = "create",
 }: {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (task: Task) => void;
+  initialTask?: Task;
+  mode?: "create" | "edit";
 }) {
   const [draft, setDraft] = useState(buildEmptyDraft);
+  const [teamMembers, setTeamMembers] = useState<string[]>([]);
 
   useEffect(() => {
+    const names = getTeamMembers();
+    setTeamMembers(names);
     if (isOpen) {
-      setDraft(buildEmptyDraft());
+      setDraft(
+        initialTask
+          ? {
+              ...initialTask,
+              assignee: initialTask.assignee || "",
+              attachments: initialTask.attachments || [],
+              comments: initialTask.comments || [],
+            }
+          : buildEmptyDraft()
+      );
     }
-  }, [isOpen]);
+  }, [isOpen, initialTask]);
 
-  if (!isOpen) {
-    return null;
+  if (!isOpen) return null;
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    const selected = Array.from(files).slice(0, 2).map((file) => {
+      const url = URL.createObjectURL(file);
+      return {
+        id: Date.now() + Math.random(),
+        name: file.name,
+        type: file.type.startsWith("image/") ? "photo" : "document",
+        url,
+      };
+    });
+
+    setDraft((prev) => ({
+      ...prev,
+      attachments: [...prev.attachments, ...selected],
+    }));
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    const member = teamMembers.find((person) => person.name === draft.assignee) ?? teamMembers[0];
     const task: Task = {
-      id: Date.now(),
+      ...draft,
+      id: initialTask?.id ?? Date.now(),
       title: draft.title.trim(),
       description: draft.description.trim() || "No description provided yet.",
-      status: draft.status,
-      project: draft.project,
-      assignee: draft.assignee,
-      assigneeColor: member.color,
+      assignee: draft.assignee || "Unassigned",
+      assigneeColor:
+        teamMembers.find((person) => person.name === draft.assignee)?.color ??
+        "#6aa8ff",
       priority: draft.priority,
-      deadline: draft.deadline,
-      progress: draft.progress,
+      startDate: draft.startDate,
+      dueDate: draft.dueDate,
+      attachments: draft.attachments || [],
+      comments: draft.comments || [],
     };
 
-    if (!task.title) {
-      return;
-    }
+    if (!task.title) return;
 
     onCreate(task);
     onClose();
@@ -66,11 +103,11 @@ export function TaskComposer({
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Create new task">
-      <div className="task-modal">
+      <div className="task-modal wider">
         <div className="task-modal-header">
           <div>
             <p className="eyebrow">New task</p>
-            <h3>Create work item</h3>
+            <h3>{mode === "edit" ? "Edit task" : "Create work item"}</h3>
           </div>
           <button type="button" className="ghost-button" onClick={onClose}>
             Close
@@ -103,7 +140,7 @@ export function TaskComposer({
             </label>
           </div>
 
-          <div className="form-grid">
+          <div className="form-grid two-col">
             <label>
               Project
               <select
@@ -124,16 +161,17 @@ export function TaskComposer({
                 value={draft.assignee}
                 onChange={(event) => setDraft((prev) => ({ ...prev, assignee: event.target.value }))}
               >
-                {teamMembers.map((member) => (
-                  <option key={member.name} value={member.name}>
-                    {member.name}
+                <option value="">Unassigned</option>
+                {teamMembers.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
                   </option>
                 ))}
               </select>
             </label>
           </div>
 
-          <div className="form-grid">
+          <div className="form-grid two-col">
             <label>
               Status
               <select
@@ -142,10 +180,10 @@ export function TaskComposer({
                   setDraft((prev) => ({ ...prev, status: event.target.value as Task["status"] }))
                 }
               >
-                <option>Backlog</option>
-                <option>In Progress</option>
-                <option>Review</option>
-                <option>Done</option>
+                <option value="Open">Open</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Review">Review</option>
+                <option value="Done">Done</option>
               </select>
             </label>
 
@@ -164,28 +202,47 @@ export function TaskComposer({
             </label>
           </div>
 
-          <div className="form-grid">
+          <div className="form-grid two-col">
             <label>
-              Due date
+              Start date
               <input
-                value={draft.deadline}
-                onChange={(event) => setDraft((prev) => ({ ...prev, deadline: event.target.value }))}
-                placeholder="Nov 30"
+                type="date"
+                value={draft.startDate}
+                onChange={(event) => setDraft((prev) => ({ ...prev, startDate: event.target.value }))}
               />
             </label>
 
             <label>
-              Progress (%)
+              Due date
               <input
-                type="number"
-                min={0}
-                max={100}
-                value={draft.progress}
-                onChange={(event) =>
-                  setDraft((prev) => ({ ...prev, progress: Number(event.target.value) || 0 }))
-                }
+                type="date"
+                value={draft.dueDate}
+                onChange={(event) => setDraft((prev) => ({ ...prev, dueDate: event.target.value }))}
               />
             </label>
+          </div>
+
+          <div className="field-group">
+            <label>
+              Attach photo / document
+              <input type="file" multiple onChange={handleFileChange} />
+            </label>
+          </div>
+
+          <div className="field-group">
+            <label>Attached files</label>
+            <div className="attachment-list">
+              {draft.attachments.length === 0 ? (
+                <span className="muted">No files attached</span>
+              ) : (
+                draft.attachments.map((attachment) => (
+                  <div key={attachment.id} className="attachment-item">
+                    <span>{attachment.name}</span>
+                    <span className="small-tag">{attachment.type}</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
           <div className="task-modal-actions">
@@ -193,7 +250,7 @@ export function TaskComposer({
               Cancel
             </button>
             <button type="submit" className="primary-button">
-              Create task
+              {mode === "edit" ? "Save changes" : "Create task"}
             </button>
           </div>
         </form>
