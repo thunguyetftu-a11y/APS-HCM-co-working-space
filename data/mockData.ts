@@ -1,14 +1,31 @@
+export type TaskComment = {
+  id: number;
+  author: string;
+  message: string;
+  createdAt: string;
+  mentions: string[];
+};
+
+export type TaskAttachment = {
+  id: number;
+  name: string;
+  type: "photo" | "document";
+  url: string;
+};
+
 export type Task = {
   id: number;
   title: string;
   description: string;
-  status: "Backlog" | "In Progress" | "Review" | "Done";
+  status: "Open" | "In Progress" | "Review" | "Done";
   project: string;
   assignee: string;
   assigneeColor: string;
   priority: "High" | "Medium" | "Low";
-  deadline: string;
-  progress: number;
+  startDate: string;
+  dueDate: string;
+  attachments: TaskAttachment[];
+  comments: TaskComment[];
 };
 
 export const quickStats = [
@@ -25,102 +42,54 @@ export const teamMembers = [
   { name: "Sam", role: "Developer", color: "#9b62ff" },
 ];
 
+export const defaultProjects = [
+  "General",
+  "Client Work",
+  "Operations",
+];
+
 export const tasks: Task[] = [
   {
     id: 1,
     title: "Landing page redesign",
     description: "Finalize homepage hero labels and product copy for launch.",
-    status: "Backlog",
-    project: "Website Redesign",
+    status: "Open",
+    project: "General",
     assignee: "Alicia",
     assigneeColor: "#4d8cff",
     priority: "High",
-    deadline: "Nov 20",
-    progress: 28,
+    startDate: "2026-11-12",
+    dueDate: "2026-11-20",
+    attachments: [],
+    comments: [],
   },
   {
     id: 2,
     title: "Prototype validation",
     description: "Collect testing notes from beta users and update flows.",
     status: "In Progress",
-    project: "Website Redesign",
+    project: "Client Work",
     assignee: "Harold",
     assigneeColor: "#26b98a",
     priority: "Medium",
-    deadline: "Nov 18",
-    progress: 64,
+    startDate: "2026-11-10",
+    dueDate: "2026-11-18",
+    attachments: [],
+    comments: [],
   },
   {
     id: 3,
     title: "Launch checklist",
     description: "Review approval list across marketing and support teams.",
     status: "Review",
-    project: "Marketing Launch",
+    project: "Operations",
     assignee: "Mila",
     assigneeColor: "#f28e2b",
     priority: "High",
-    deadline: "Nov 22",
-    progress: 82,
-  },
-  {
-    id: 4,
-    title: "Bug triage",
-    description: "Resolve payment flow issues and prepare deployment notes.",
-    status: "Done",
-    project: "Operations",
-    assignee: "Sam",
-    assigneeColor: "#9b62ff",
-    priority: "Low",
-    deadline: "Nov 16",
-    progress: 100,
-  },
-  {
-    id: 5,
-    title: "CRM sync",
-    description: "Connect account and contact sync across all projects.",
-    status: "In Progress",
-    project: "Operations",
-    assignee: "Sam",
-    assigneeColor: "#9b62ff",
-    priority: "Medium",
-    deadline: "Nov 21",
-    progress: 55,
-  },
-  {
-    id: 6,
-    title: "Ad campaign review",
-    description: "Approve creative assets for outreach sequence and retargeting.",
-    status: "Backlog",
-    project: "Marketing Launch",
-    assignee: "Mila",
-    assigneeColor: "#f28e2b",
-    priority: "High",
-    deadline: "Nov 23",
-    progress: 18,
-  },
-  {
-    id: 7,
-    title: "Support macros",
-    description: "Draft a quicker troubleshooting workflow for the Q&A team.",
-    status: "Review",
-    project: "Operations",
-    assignee: "Alicia",
-    assigneeColor: "#4d8cff",
-    priority: "Medium",
-    deadline: "Nov 19",
-    progress: 72,
-  },
-  {
-    id: 8,
-    title: "Roadmap refresh",
-    description: "Finalize quarter plan and shared milestone updates for all teams.",
-    status: "Done",
-    project: "Website Redesign",
-    assignee: "Harold",
-    assigneeColor: "#26b98a",
-    priority: "Low",
-    deadline: "Nov 17",
-    progress: 100,
+    startDate: "2026-11-14",
+    dueDate: "2026-11-22",
+    attachments: [],
+    comments: [],
   },
 ];
 
