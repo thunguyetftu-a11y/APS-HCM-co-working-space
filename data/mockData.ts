@@ -1,3 +1,16 @@
+export type Task = {
+  id: number;
+  title: string;
+  description: string;
+  status: "Backlog" | "In Progress" | "Review" | "Done";
+  project: string;
+  assignee: string;
+  assigneeColor: string;
+  priority: "High" | "Medium" | "Low";
+  deadline: string;
+  progress: number;
+};
+
 export const quickStats = [
   { label: "Active Tasks", value: "32", icon: "✓", tint: "#eaf4ff" },
   { label: "Team Progress", value: "74%", icon: "↗", tint: "#edf8f2" },
@@ -12,7 +25,7 @@ export const teamMembers = [
   { name: "Sam", role: "Developer", color: "#9b62ff" },
 ];
 
-export const tasks = [
+export const tasks: Task[] = [
   {
     id: 1,
     title: "Landing page redesign",
@@ -110,6 +123,8 @@ export const tasks = [
     progress: 100,
   },
 ];
+
+export const initialTasks = tasks;
 
 export const calendarEvents = [
   { title: "Sprint Review", type: "Meeting", time: "09:00" },
