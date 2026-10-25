@@ -1,3 +1,4 @@
+"use client";
 import { useMemo, useState } from "react";
 
 import { calendarEvents, milestones, quickStats, tasks, teamMembers } from "@/data/mockData";
