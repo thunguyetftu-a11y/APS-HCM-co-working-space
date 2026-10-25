@@ -45,7 +45,8 @@ export function AppShell({
 
         <nav className="nav-menu">
           {navItems.map((item) => {
-            const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+            const active =
+              pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
             return (
               <Link key={item.href} href={item.href} className={`nav-item ${active ? "active" : ""}`}>
                 {item.label}
@@ -57,23 +58,15 @@ export function AppShell({
         <div className="sidebar-card">
           <p className="eyebrow">Team members</p>
           <div className="member-stack">
-            {readSignedInUser()
-              ? [
-                  {
-                    name: readSignedInUser()!.name,
-                    role: "Owner",
-                    color: "#6aa8ff",
-                  },
-                ].map((member) => (
-                  <div className="member-item" key={member.name}>
-                    <div className="avatar" style={{ background: member.color }}>{member.name[0]}</div>
-                    <div>
-                      <strong>{member.name}</strong>
-                      <span>{member.role}</span>
-                    </div>
-                  </div>
-                ))
-              : null}
+            {user ? (
+              <div className="member-item">
+                <div className="avatar" style={{ background: "#6aa8ff" }}>{user.name[0]}</div>
+                <div>
+                  <strong>{user.name}</strong>
+                  <span>Owner</span>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </aside>
