@@ -1,61 +1,105 @@
-import Link from "next/link";
+"use client";
 
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { tasks } from "@/data/mockData";
-
-const projectGroups = [
-  { name: "Website Redesign", total: 4, completed: 2, due: "Nov 24" },
-  { name: "Marketing Launch", total: 3, completed: 1, due: "Nov 26" },
-  { name: "Operations", total: 5, completed: 3, due: "Nov 29" },
-];
+import {
+  readStoredProjects,
+  writeStoredProjects,
+} from "@/lib/plannerStorage";
 
 export default function ProjectsPage() {
-  return (
-    <AppShell title="Projects" subtitle="Portfolio overview">
-      <div className="stats-grid">
-        {projectGroups.map((project) => (
-          <div className="stat-card" key={project.name}>
-            <div className="stat-icon" style={{ background: "#edf4ff" }}>▣</div>
-            <div>
-              <p>{project.name}</p>
-              <h3>{project.completed}/{project.total}</h3>
-            </div>
-          </div>
-        ))}
-      </div>
+  const [projects, setProjects] = useState<string[]>([]);
+  const [draft, setDraft] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-      <div className="panel-box full-width">
+  useEffect(() => {
+    const savedProjects = readStoredProjects();
+    setProjects(savedProjects.map((project) => project.name));
+  }, []);
+
+  function handleCreateProject() {
+    const projectName = draft.trim();
+    if (!projectName) return;
+
+    setProjects((current) => {
+      const exists = current.includes(projectName);
+      if (exists) return current;
+      return [...current, projectName];
+    });
+
+    setDraft("");
+  }
+
+  function handleUpdateProject(projectName: string) {
+    const updatedName = draft.trim();
+    if (!updatedName) return;
+
+    setProjects((current) =>
+      current.map((item) => (item === projectName ? updatedName : item))
+    );
+    setDraft("");
+    setEditingId(null);
+  }
+
+  useEffect(() => {
+    writeStoredProjects(projects.map((name, index) => ({ id: String(index), name })));
+  }, [projects]);
+
+  return (
+    <AppShell title="Projects" subtitle="All team projects">
+      <div className="panel-box">
         <div className="section-header">
-          <h3>Project pipeline</h3>
-          <span>{tasks.length} tasks tracked</span>
+          <h3>Projects</h3>
+          <button type="button" className="primary-button" onClick={() => setDraft("")}>
+            New project
+          </button>
         </div>
 
-        <div className="project-list">
-          {projectGroups.map((project) => {
-            const progress = Math.round((project.completed / project.total) * 100);
-            return (
-              <div className="project-card" key={project.name}>
-                <div className="project-header-row">
-                  <strong>{project.name}</strong>
-                  <span>Due {project.due}</span>
-                </div>
+        <div className="project-form">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Project name"
+          />
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => {
+              if (editingId) {
+                handleUpdateProject(editingId);
+              } else {
+                handleCreateProject();
+              }
+            }}
+          >
+            {editingId ? "Save project" : "Create project"}
+          </button>
+        </div>
 
-                <div className="project-progress">
-                  <div className="progress-track">
-                    <div className="progress-fill" style={{ width: `${progress}%` }} />
+        <div className="project-grid">
+          {projects.length === 0 ? (
+            <div className="muted">No projects yet</div>
+          ) : (
+            projects.map((project) => (
+              <div key={project} className="project-card">
+                <div className="project-row">
+                  <div>
+                    <h4>{project}</h4>
                   </div>
-                  <span>{progress}%</span>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => {
+                      setDraft(project);
+                      setEditingId(project);
+                    }}
+                  >
+                    Edit
+                  </button>
                 </div>
-
-                <div className="project-metrics">
-                  <span>{project.completed} completed</span>
-                  <span>{project.total - project.completed} remaining</span>
-                </div>
-
-                <Link href="/projects/launch-sprint" className="secondary-link">View details</Link>
               </div>
-            );
-          })}
+            ))
+          )}
         </div>
       </div>
     </AppShell>
