@@ -23,8 +23,13 @@ export async function POST(request: Request, { params }: { params: { id: string 
     if (!url || !serviceKey) return NextResponse.json({ error: "Server setup is incomplete. Add SUPABASE_SERVICE_ROLE_KEY to Vercel Project Environment Variables." }, { status: 500 });
     const admin = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
 
-    const { data: profile } = await admin.from("profiles").select("id,display_name,email").ilike("email", email).maybeSingle();
+    const { data: profile } = await admin.from("profiles").select("id,display_name,email").ilike("email", email).limit(1).maybeSingle();
     let memberId = profile?.id as string | undefined;
+    if (!memberId) {
+      const { data: users, error: usersError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      if (usersError) return NextResponse.json({ error: usersError.message }, { status: 400 });
+      memberId = users.users.find((item) => item.email?.toLowerCase() === email)?.id;
+    }
     let invited = false;
 
     if (!memberId) {

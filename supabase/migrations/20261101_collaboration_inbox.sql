@@ -78,3 +78,25 @@ drop policy if exists "users view own notifications" on public.notifications;
 create policy "users view own notifications" on public.notifications for select to authenticated using(user_id=auth.uid());
 drop policy if exists "users update own notifications" on public.notifications;
 create policy "users update own notifications" on public.notifications for update to authenticated using(user_id=auth.uid()) with check(user_id=auth.uid());
+
+
+-- Create Inbox notifications for @mentions stored on task comments.
+create or replace function public.notify_comment_mentions()
+returns trigger language plpgsql security definer set search_path=public
+as $$
+declare mentioned_user uuid; task_row record;
+begin
+  select id,project_id,title into task_row from public.tasks where id=new.task_id;
+  foreach mentioned_user in array coalesce(new.mentions,'{}'::uuid[]) loop
+    if mentioned_user <> new.author_id then
+      insert into public.notifications(user_id,project_id,task_id,actor_id,kind,message)
+      values(mentioned_user,task_row.project_id,new.task_id,new.author_id,'task_mention',
+        'You were mentioned in a comment on task: '||task_row.title);
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+drop trigger if exists task_comment_mention_notification on public.task_comments;
+create trigger task_comment_mention_notification after insert on public.task_comments
+for each row execute function public.notify_comment_mentions();
