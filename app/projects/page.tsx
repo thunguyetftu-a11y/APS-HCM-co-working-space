@@ -1,107 +1,69 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import {
-  readStoredProjects,
-  writeStoredProjects,
-} from "@/lib/plannerStorage";
+import { createClient } from "@/lib/supabase/client";
+
+type Project = { id: string; name: string; description: string; created_at: string };
 
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<string[]>([]);
-  const [draft, setDraft] = useState("");
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const savedProjects = readStoredProjects();
-    setProjects(savedProjects.map((project) => project.name));
-  }, []);
-
-  function handleCreateProject() {
-    const projectName = draft.trim();
-    if (!projectName) return;
-
-    setProjects((current) => {
-      const exists = current.includes(projectName);
-      if (exists) return current;
-      return [...current, projectName];
-    });
-
-    setDraft("");
+  async function loadProjects() {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id ?? null);
+      if (!user) { setProjects([]); setMessage("Sign in to view and create shared projects."); return; }
+      const { data, error } = await supabase.from("projects").select("id,name,description,created_at").order("created_at", { ascending: false });
+      if (error) throw error;
+      setProjects(data ?? []);
+      setMessage("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load projects. Check your Supabase setup.");
+    } finally { setLoading(false); }
   }
 
-  function handleUpdateProject(projectName: string) {
-    const updatedName = draft.trim();
-    if (!updatedName) return;
+  useEffect(() => { void loadProjects(); }, []);
 
-    setProjects((current) =>
-      current.map((item) => (item === projectName ? updatedName : item))
-    );
-    setDraft("");
-    setEditingId(null);
+  async function createProject(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!name.trim() || !userId) return;
+    setSaving(true); setMessage("");
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.from("projects").insert({ name: name.trim(), description: description.trim(), created_by: userId }).select("id,name,description,created_at").single();
+      if (error) throw error;
+      setProjects((current) => [data, ...current]);
+      setName(""); setDescription("");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Project could not be created.");
+    } finally { setSaving(false); }
   }
 
-  useEffect(() => {
-    writeStoredProjects(projects.map((name, index) => ({ id: String(index), name })));
-  }, [projects]);
-
-  return (
-    <AppShell title="Projects" subtitle="All team projects">
-      <div className="panel-box">
-        <div className="section-header">
-          <h3>Projects</h3>
-          <button type="button" className="primary-button" onClick={() => setDraft("")}>
-            New project
-          </button>
+  return <AppShell title="Projects" subtitle="Shared team workspace">
+    <section className="panel-box" style={{ padding: 20 }}>
+      <div className="section-header"><h3>Your projects</h3><span>{projects.length} projects</span></div>
+      {userId && <form onSubmit={createProject} className="task-form" style={{ marginBottom: 24 }}>
+        <div className="form-grid">
+          <label>Project name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Website redesign" required /></label>
+          <label>Short description<input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this project about?" /></label>
         </div>
-
-        <div className="project-form">
-          <input
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Project name"
-          />
-          <button
-            type="button"
-            className="primary-button"
-            onClick={() => {
-              if (editingId) {
-                handleUpdateProject(editingId);
-              } else {
-                handleCreateProject();
-              }
-            }}
-          >
-            {editingId ? "Save project" : "Create project"}
-          </button>
-        </div>
-
-        <div className="project-grid">
-          {projects.length === 0 ? (
-            <div className="muted">No projects yet</div>
-          ) : (
-            projects.map((project) => (
-              <div key={project} className="project-card">
-                <div className="project-row">
-                  <div>
-                    <h4>{project}</h4>
-                  </div>
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => {
-                      setDraft(project);
-                      setEditingId(project);
-                    }}
-                  >
-                    Edit
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    </AppShell>
-  );
+        <div><button className="primary-button" disabled={saving}>{saving ? "Creating…" : "Create project"}</button></div>
+      </form>}
+      {message && <p className="auth-status error">{message}</p>}
+      {loading ? <p className="muted">Loading projects…</p> : projects.length === 0 ? <p className="muted">No projects to show yet.</p> :
+        <div className="project-grid">{projects.map((project) => <article className="project-card" key={project.id}>
+          <div className="project-row"><div><h4>{project.name}</h4><p className="muted">{project.description || "No description yet"}</p></div>
+            <Link className="secondary-button" href={`/projects/${project.id}`}>Open</Link></div>
+        </article>)}</div>}
+    </section>
+  </AppShell>;
 }
