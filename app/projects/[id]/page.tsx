@@ -47,7 +47,8 @@ export default function ProjectDetailPage() {
         supabase.from("projects").select("id,name,description").eq("id", projectId).single(),
         supabase.from("sections").select("id,name,position").eq("project_id", projectId).order("position"),
         supabase.from("tasks").select("id,section_id,title,description,start_date,due_date,is_done,is_on_going").eq("project_id", projectId).order("created_at", { ascending: false }),
-        supabase.from("project_members").select("user_id,can_view,can_create,can_edit").eq("project_id", projectId)
+        supabase.from("project_members").select("user_id,can_view,can_create,can_edit").eq("project_id", projectId),
+        supabase.from("profiles").select("id,display_name,email")
       ]);
       if (p.error) throw p.error;
       if (s.error) throw s.error;
