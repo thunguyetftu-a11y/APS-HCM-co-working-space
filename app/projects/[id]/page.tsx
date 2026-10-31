@@ -97,8 +97,28 @@ export default function ProjectDetailPage() {
     if (error) setNotice(error.message); else await load();
   }
 
-  async function inviteMember(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setNotice("To add a member, first ensure their account exists. Entering an email alone cannot securely create an account or grant access. Member invitations will be connected to Supabase Auth in the next step.");
+  async function inviteMember(event?: React.FormEvent<HTMLFormElement>, selectedEmail?: string) {
+    event?.preventDefault();
+    const email = (selectedEmail ?? memberEmail).trim().toLowerCase();
+    if (!email) { setNotice("Enter an email address."); return; }
+    setBusy(true); setNotice("");
+    try {
+      const response = await fetch(`/api/projects/${projectId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not add member.");
+      setMemberEmail("");
+      setSuggestionsOpen(false);
+      setNotice(result.invited ? "Invitation sent. Ask the user to check their email." : "Member added to the project.");
+      await load();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Could not add member.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function savePermission(member: Member, key: "can_view" | "can_create" | "can_edit", value: boolean) {
