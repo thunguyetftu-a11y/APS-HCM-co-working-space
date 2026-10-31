@@ -65,10 +65,13 @@ export function TaskComposer({
   if (!isOpen) return null;
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
+  const files = event.target.files;
 
-    const selected = Array.from(files).slice(0, 2).map((file) => {
+  if (!files || files.length === 0) return;
+
+  const selected: TaskAttachment[] = Array.from(files)
+    .slice(0, 2)
+    .map((file): TaskAttachment => {
       const url = URL.createObjectURL(file);
 
       return {
@@ -79,12 +82,11 @@ export function TaskComposer({
       };
     });
 
-    setDraft((prev) => ({
-      ...prev,
-      attachments: [...prev.attachments, ...selected],
-    }));
-  }
-
+  setDraft((prev) => ({
+    ...prev,
+    attachments: [...prev.attachments, ...selected],
+  }));
+}
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
