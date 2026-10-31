@@ -42,11 +42,16 @@ export default function TasksPage() {
   }
 
   function handleDoneToggle(task: Task) {
-    const nextTask = {
-      ...task,
-      status: task.status === "Done" ? "Open" : "Done",
-    };
-    setTasks((current) => current.map((item) => item.id === task.id ? nextTask : item));
+    const nextTask: Task = {
+  ...task,
+  status: task.status === "Done" ? "Open" : "Done",
+};
+
+setTasks((current) =>
+  current.map((item) =>
+    item.id === task.id ? nextTask : item
+  )
+);
   }
 
   return (
