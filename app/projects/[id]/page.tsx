@@ -10,6 +10,7 @@ type Project = { id: string; name: string; description: string };
 type Section = { id: string; name: string; position: number };
 type Task = { id: string; section_id: string | null; title: string; description: string; start_date: string | null; due_date: string | null; is_done?: boolean; is_on_going?: boolean; progress?: string };
 type Member = { user_id: string; can_view: boolean; can_create: boolean; can_edit: boolean; profiles?: { display_name: string; email: string } | null };
+type Profile = { id: string; display_name: string; email: string };
 
 function getProgress(task: Task) {
   if (task.is_done) return "Done";
@@ -27,6 +28,8 @@ export default function ProjectDetailPage() {
   const [sections, setSections] = useState<Section[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
   const [sectionName, setSectionName] = useState("");
   const [taskDrafts, setTaskDrafts] = useState<Record<string, string>>({});
   const [memberEmail, setMemberEmail] = useState("");
@@ -40,7 +43,7 @@ export default function ProjectDetailPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setNotice("Please sign in to access this project."); return; }
-      const [p, s, t, m] = await Promise.all([
+      const [p, s, t, m, pr] = await Promise.all([
         supabase.from("projects").select("id,name,description").eq("id", projectId).single(),
         supabase.from("sections").select("id,name,position").eq("project_id", projectId).order("position"),
         supabase.from("tasks").select("id,section_id,title,description,start_date,due_date,is_done,is_on_going").eq("project_id", projectId).order("created_at", { ascending: false }),
@@ -52,7 +55,7 @@ export default function ProjectDetailPage() {
       setProject(p.data); setSections(s.data ?? []); setTasks(t.data ?? []);
       const mine = (m.data ?? []).find((member) => member.user_id === user.id);
       setCanCreate(Boolean(mine?.can_create)); setCanEdit(Boolean(mine?.can_edit));
-      setMembers(m.data ?? []);
+      setMembers(m.data ?? []); setProfiles((pr.data ?? []) as Profile[]);
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not load project."); }
   }
 
@@ -134,7 +137,7 @@ export default function ProjectDetailPage() {
           <code>{member.user_id.slice(0,8)}…</code>
           <div style={{display:"flex",gap:14,flexWrap:"wrap"}}>{(["can_view","can_create","can_edit"] as const).map(key => <label key={key} style={{display:"flex",gap:5,alignItems:"center",fontSize:13}}><input type="checkbox" checked={Boolean(member[key])} disabled={!canEdit} onChange={e => void savePermission(member,key,e.target.checked)} />{key.replace("can_","")}</label>)}</div>
         </div>)}
-        {canEdit && <form onSubmit={inviteMember} className="project-form" style={{marginTop:14}}><input type="email" value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="Team member email" /><button className="secondary-button">Invite member</button></form>}
+        {canEdit && <div style={{position:"relative",marginTop:14}}><form onSubmit={(e)=>void inviteMember(e)} className="project-form"><input type="email" value={memberEmail} onFocus={()=>setSuggestionsOpen(true)} onChange={e=>{setMemberEmail(e.target.value);setSuggestionsOpen(true);}} placeholder="Enter email or select an existing user" /><button className="secondary-button" disabled={busy}>{busy?"Adding…":"Add member"}</button></form>{suggestionsOpen && memberEmail && profiles.filter(p=>p.email?.toLowerCase().includes(memberEmail.toLowerCase())).slice(0,6).length>0 && <div className="project-card" style={{position:"absolute",zIndex:10,left:0,right:0,top:"100%",padding:8}}>{profiles.filter(p=>p.email?.toLowerCase().includes(memberEmail.toLowerCase())).slice(0,6).map(p=><button key={p.id} type="button" className="text-button" style={{display:"block",padding:8}} onClick={()=>void inviteMember(undefined,p.email)}>{p.display_name || p.email} · {p.email}</button>)}</div>}<p className="muted">Existing accounts are added immediately. New email addresses receive a Supabase invitation to create an account.</p></div>}
         {notice && <p className="auth-status error">{notice}</p>}
       </section>
     </div>

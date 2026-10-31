@@ -10,6 +10,7 @@ const navItems = [
   { label: "Overview", href: "/" },
   { label: "Projects", href: "/projects" },
   { label: "Calendar", href: "/calendar" },
+  { label: "Inbox", href: "/inbox" },
   { label: "Reports", href: "/reports" },
   { label: "Settings", href: "/settings" },
 ];
