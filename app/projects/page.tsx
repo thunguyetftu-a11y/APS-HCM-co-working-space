@@ -93,7 +93,7 @@ export default function ProjectsPage() {
               {(sectionMap[project.id]||[]).length===0&&!loadingProject&&<p className="muted">No sections yet.</p>}
             </div>}
           </div>)}
-        </div>
+        </div>}
     </section>
   </AppShell>;
 }
