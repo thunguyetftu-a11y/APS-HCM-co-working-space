@@ -132,7 +132,7 @@ export default function ProjectDetailPage() {
   function handleCommentChange(value:string, cursor:number) {
     setCommentDraft(value);
     setSelectedMentions(ids=>ids.filter(id=>{const p=profiles.find(x=>x.id===id);return !!p && value.includes("@"+(p.display_name||p.email));}));
-    const before=value.slice(0,cursor); const match=before.match(/(?:^|\\s)@([^@\\s]*)$/);
+    const before=value.slice(0,cursor); const match=before.match(/(?:^|\s)@([^@\s]*)$/);
     if(match){setMentionQuery(match[1]);setMentionStart(cursor-match[1].length-1);}else{setMentionQuery(null);setMentionStart(null);}
   }
   function insertMention(profile:Profile) {
