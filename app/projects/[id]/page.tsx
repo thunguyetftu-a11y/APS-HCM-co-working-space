@@ -46,6 +46,10 @@ export default function ProjectDetailPage() {
   const [taskStart, setTaskStart] = useState("");
   const [taskDue, setTaskDue] = useState("");
   const [subtaskTitle, setSubtaskTitle] = useState("");
+  const [assigneeIds,setAssigneeIds]=useState<string[]>([]);
+  const [comments,setComments]=useState<any[]>([]);
+  const [commentDraft,setCommentDraft]=useState("");
+  const [attachments,setAttachments]=useState<any[]>([]);
 
   async function load() {
     try {
@@ -99,7 +103,36 @@ export default function ProjectDetailPage() {
     finally { setBusy(false); }
   }
 
-  function openTask(task: Task) { setActiveTask(task); setTaskTitle(task.title); setTaskDescription(task.description || ""); setTaskPriority(task.priority || "medium"); setTaskStart(task.start_date || ""); setTaskDue(task.due_date || ""); setSubtaskTitle(""); }
+  async function openTask(task: Task) {
+    setActiveTask(task);setTaskTitle(task.title);setTaskDescription(task.description||"");setTaskPriority(task.priority||"medium");setTaskStart(task.start_date||"");setTaskDue(task.due_date||"");setSubtaskTitle("");setCommentDraft("");
+    const db=createClient();
+    const [a,b,d]=await Promise.all([db.from("task_assignees").select("user_id").eq("task_id",task.id),db.from("task_comments").select("id,body,author_id,created_at").eq("task_id",task.id).order("created_at"),db.from("attachments").select("id,file_name,bucket_path").eq("task_id",task.id).order("created_at")]);
+    setAssigneeIds((a.data||[]).map(x=>x.user_id));setComments(b.data||[]);setAttachments(d.data||[]);
+  }
+  async function updateAssignees(ids:string[]) {
+    if(!activeTask)return;const db=createClient();const {error:delError}=await db.from("task_assignees").delete().eq("task_id",activeTask.id);
+    if(delError){setNotice(delError.message);return;}if(ids.length){const {error}=await db.from("task_assignees").insert(ids.map(user_id=>({task_id:activeTask.id,user_id})));if(error){setNotice(error.message);return;}}setAssigneeIds(ids);
+  }
+  async function postComment(e:React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();if(!activeTask||!commentDraft.trim())return;const {data:{user}}=await createClient().auth.getUser();if(!user)return;
+    const mentions=profiles.filter(p=>p.email&&commentDraft.toLowerCase().includes("@"+p.email.toLowerCase())).map(p=>p.id);
+    const {error}=await createClient().from("task_comments").insert({task_id:activeTask.id,author_id:user.id,body:commentDraft.trim(),mentions});
+    if(error)setNotice(error.message);else{setCommentDraft("");await openTask(activeTask);}
+  }
+  async function uploadTaskAttachment(e:React.ChangeEvent<HTMLInputElement>) {
+    const file=e.target.files?.[0];if(!file||!activeTask)return;const {data:{user}}=await createClient().auth.getUser();if(!user)return;
+    const db=createClient();const path=projectId+"/"+activeTask.id+"/"+Date.now()+"-"+file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+    const {error:upError}=await db.storage.from("task-attachments").upload(path,file);if(upError){setNotice(upError.message);return;}
+    const {error}=await db.from("attachments").insert({project_id:projectId,task_id:activeTask.id,uploaded_by:user.id,bucket_path:path,file_name:file.name,mime_type:file.type||"application/octet-stream",size_bytes:file.size});
+    if(error)setNotice(error.message);else await openTask(activeTask);e.target.value="";
+  }
+  async function openTaskAttachment(path:string) {
+    const {data,error}=await createClient().storage.from("task-attachments").createSignedUrl(path,300);if(error)setNotice(error.message);else if(data?.signedUrl)window.open(data.signedUrl,"_blank","noopener,noreferrer");
+  }
+  function wrapDescription(before:string,after="") {
+    const el=document.getElementById("task-description") as HTMLTextAreaElement|null;if(!el)return;const a=el.selectionStart,b=el.selectionEnd,selected=taskDescription.slice(a,b)||"text";
+    setTaskDescription(taskDescription.slice(0,a)+before+selected+after+taskDescription.slice(b));requestAnimationFrame(()=>{el.focus();el.setSelectionRange(a+before.length,a+before.length+selected.length);});
+  }
 
   async function saveTask(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); if (!activeTask || !taskTitle.trim()) return;
@@ -181,7 +214,7 @@ export default function ProjectDetailPage() {
         <div className="section-header"><h3>Task details</h3><button type="button" className="secondary-button" onClick={()=>setActiveTask(null)}>Close</button></div>
         <form onSubmit={e=>void saveTask(e)} className="task-form">
           <label>Task name<input value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} required/></label>
-          <label>Description<textarea value={taskDescription} onChange={e=>setTaskDescription(e.target.value)} rows={4} placeholder="Task details and expected result"/></label>
+          <label>Description<div className="text-format-toolbar"><button type="button" onClick={()=>wrapDescription("**","**")}><b>B</b></button><button type="button" onClick={()=>wrapDescription("*","*")}><i>I</i></button><button type="button" onClick={()=>wrapDescription("\n- ")}>• List</button><button type="button" onClick={()=>wrapDescription("\n## ")}>Heading</button></div><textarea id="task-description" value={taskDescription} onChange={e=>setTaskDescription(e.target.value)} rows={5} placeholder="Task details and expected result"/></div></label>
           <div className="form-grid">
             <label>Priority<select value={taskPriority} onChange={e=>setTaskPriority(e.target.value)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
             <label>Start date<input type="date" value={taskStart} onChange={e=>setTaskStart(e.target.value)}/></label>
@@ -189,7 +222,11 @@ export default function ProjectDetailPage() {
           </div>
           <button className="primary-button" disabled={busy}>{busy?"Saving…":"Save task"}</button>
         </form>
-        <div style={{marginTop:18}}><h4>Subtasks</h4>{tasks.filter(t=>t.parent_task_id===activeTask.id).map(t=><p key={t.id} className="muted">{t.title} · {getProgress(t)}</p>)}
+<div className="task-extra-grid">
+          <section className="task-extra-block"><h4>Assignees</h4>{canEdit?<div className="assignee-options">{profiles.filter(p=>members.some(m=>m.user_id===p.id)).map(p=><label key={p.id}><input type="checkbox" checked={assigneeIds.includes(p.id)} onChange={e=>void updateAssignees(e.target.checked?[...assigneeIds,p.id]:assigneeIds.filter(id=>id!==p.id))}/>{p.display_name||p.email||"Team member"}</label>)}</div>:<p className="muted">{assigneeIds.length?assigneeIds.length+" assigned":"Not assigned"}</p>}</section>
+          <section className="task-extra-block"><h4>Attachments</h4><div className="attachment-list">{attachments.map(file=><button type="button" className="attachment-item" key={file.id} onClick={()=>void openTaskAttachment(file.bucket_path)}>{file.file_name}</button>)}</div><label className="file-upload">＋ Attach file<input type="file" onChange={e=>void uploadTaskAttachment(e)}/></label></section>
+          <section className="task-extra-block"><h4>Comments &amp; @mentions</h4><div className="task-comments">{comments.map(comment=><article className="comment-item" key={comment.id}><div className="comment-meta"><strong>{profiles.find(p=>p.id===comment.author_id)?.display_name||"Team member"}</strong><span>{new Date(comment.created_at).toLocaleString()}</span></div><p>{comment.body}</p></article>)}</div><form className="comment-box" onSubmit={e=>void postComment(e)}><textarea value={commentDraft} onChange={e=>setCommentDraft(e.target.value)} placeholder="Write a comment… Use @email to mention a teammate"/><button className="primary-button" disabled={!commentDraft.trim()}>Comment</button></form></section>
+        </div>        <div style={{marginTop:18}}><h4>Subtasks</h4>{tasks.filter(t=>t.parent_task_id===activeTask.id).map(t=><p key={t.id} className="muted">{t.title} · {getProgress(t)}</p>)}
           {canCreate && <form onSubmit={e=>void addSubtask(e)} className="project-form"><input value={subtaskTitle} onChange={e=>setSubtaskTitle(e.target.value)} placeholder="New subtask"/><button className="secondary-button">Add subtask</button></form>}
         </div>
       </section></div>}
