@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { createClient } from "@/lib/supabase/client";
 
-type Project = { id: string; name: string; description: string; created_at: string };
+type Project = { id: string; name: string; description: string; created_at: string }; type Section={id:string;name:string;position:number}; type Task={id:string;section_id:string|null;title:string;priority:string;start_date:string|null;due_date:string|null;is_done:boolean;is_on_going:boolean};
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -16,6 +16,9 @@ export default function ProjectsPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
+  const [expanded,setExpanded]=useState<string[]>([]);
+  const [sectionMap,setSectionMap]=useState<Record<string,Section[]>>({});
+  const [taskMap,setTaskMap]=useState<Record<string,Task[]>>({});
 
   async function loadProjects() {
     try {
@@ -33,6 +36,7 @@ export default function ProjectsPage() {
   }
 
   useEffect(() => { void loadProjects(); }, []);
+  async function toggleProject(id:string){if(expanded.includes(id)){setExpanded(v=>v.filter(x=>x!==id));return;}setExpanded(v=>[...v,id]);if(sectionMap[id])return;const db=createClient();const [a,b]=await Promise.all([db.from("sections").select("id,name,position").eq("project_id",id).order("position"),db.from("tasks").select("id,section_id,title,priority,start_date,due_date,is_done,is_on_going").eq("project_id",id).is("parent_task_id",null).order("created_at")]);if(a.error||b.error){setMessage(a.error?.message||b.error?.message||"Unable to load tasks");return;}setSectionMap(v=>({...v,[id]:a.data||[]}));setTaskMap(v=>({...v,[id]:b.data||[]}));}
 
   async function createProject(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,8 +66,7 @@ export default function ProjectsPage() {
       {message && <p className="auth-status error">{message}</p>}
       {loading ? <p className="muted">Loading projects…</p> : projects.length === 0 ? <p className="muted">No projects to show yet.</p> :
         <div className="project-grid">{projects.map((project) => <article className="project-card" key={project.id}>
-          <div className="project-row"><div><h4>{project.name}</h4><p className="muted">{project.description || "No description yet"}</p></div>
-            <Link className="secondary-button" href={`/projects/${project.id}`}>Open</Link></div>
+          <div className="project-row"><button type="button" className="project-title-toggle" onClick={()=>void toggleProject(project.id)}><span>{expanded.includes(project.id)?"⌄":"›"}</span><span><strong>{project.name}</strong><small>{project.description||"No description yet"}</small></span></button><Link className="secondary-button" href={`/projects/${project.id}`}>Details</Link></div>{expanded.includes(project.id)&&<div className="project-inline-content">{(sectionMap[project.id]||[]).map(section=><div className="project-inline-section" key={section.id}><strong>{section.name}</strong><div className="project-inline-table"><div className="project-inline-head"><span>Task</span><span>Start</span><span>Due</span><span>Priority</span><span>Progress</span></div>{(taskMap[project.id]||[]).filter(t=>t.section_id===section.id).map(task=><Link href={`/projects/${project.id}`} className="project-inline-task" key={task.id}><span>{task.title}</span><span>{task.start_date||"—"}</span><span>{task.due_date||"—"}</span><span>{task.priority||"medium"}</span><span>{task.is_done?"Done":task.is_on_going?"On-going":"Open"}</span></Link>)}</div></div>)}{(sectionMap[project.id]||[]).length===0&&<p className="muted">No sections yet.</p>}</div>}
         </article>)}</div>}
     </section>
   </AppShell>;
