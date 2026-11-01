@@ -97,4 +97,3 @@ export default function ProjectsPage() {
     </section>
   </AppShell>;
 }
-}
