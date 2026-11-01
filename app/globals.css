@@ -947,3 +947,36 @@ a { text-decoration: none; color: inherit; }
 .mention-suggestions strong{font-size:11px;color:#34445b}
 .mention-suggestions small{font-size:10px;color:#8b96a6}
 @media(max-width:700px){.project-inline-table{overflow-x:auto}.project-inline-head,.project-inline-task{min-width:850px}.task-drawer{padding:15px}}
+
+
+/* Asana-inspired project index and task list */
+.project-grid{display:block}
+.project-list-table{border:1px solid #e9edf3;border-radius:12px;overflow:hidden;background:#fff}
+.project-list-head,.project-list-row{display:grid;grid-template-columns:minmax(190px,1.35fr) minmax(180px,1.3fr) 70px 110px 110px;gap:14px;align-items:center;padding:10px 14px}
+.project-list-head{background:#f8f9fb;color:#8b96a6;font-size:10px;text-transform:uppercase;letter-spacing:.05em;font-weight:650}
+.project-list-entry+.project-list-entry{border-top:1px solid #eef1f5}
+.project-list-row{min-height:48px;font-size:11.5px;color:#56657a}
+.project-list-row:hover{background:#fafbfd}
+.project-title-toggle{display:flex;align-items:center;gap:9px;border:0;background:none;padding:0;text-align:left;cursor:pointer;color:#35445a;font-size:12px;font-weight:650}
+.project-expand-icon{width:16px;color:#8290a3;font-size:16px}
+.project-list-description,.project-list-date{font-size:11px;color:#8a95a5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.project-list-count{font-variant-numeric:tabular-nums;color:#66758a}
+.project-details-link{font-size:11px;color:#5274a6;text-align:right}
+.project-inline-content{padding:0 12px 12px 38px;background:#fbfcfe}
+.project-inline-head,.project-inline-task{grid-template-columns:minmax(160px,2fr) minmax(110px,1.2fr) 90px 90px 80px 100px 85px;min-width:850px}
+.project-inline-table{overflow-x:auto}
+.project-task-name{font-size:11.5px;color:#3d506b;font-weight:550;text-decoration:none}
+.project-task-name:hover{color:#356fc1;text-decoration:underline}
+.project-inline-task{display:grid}
+.project-add-actions{display:flex;gap:7px}
+.quick-task-create{display:grid;grid-template-columns:minmax(180px,1fr) minmax(130px,.5fr) auto auto;gap:8px;padding:10px;background:#f8fafd;border:1px solid #e8edf4;border-radius:10px;margin:12px 0}
+.quick-task-create input,.quick-task-create select{min-width:0;border:1px solid #e3e9f1;border-radius:7px;padding:8px 10px;background:white;font-size:11px}
+.project-member-identity{display:grid;gap:3px;min-width:180px}
+.project-member-identity strong{font-size:11.5px;color:#46566d}
+.project-member-identity small{font-size:10px;color:#8a96a7}
+.asana-task-header,.asana-task-row{grid-template-columns:minmax(150px,2fr) minmax(90px,1fr) 85px 85px 75px 85px minmax(125px,1.1fr);min-width:850px}
+.asana-task-table{overflow-x:auto}
+.asana-task-header{font-size:9.5px}
+.asana-task-row{font-size:10.5px}
+.asana-task-row .task-row-meta{font-size:10px}
+@media(max-width:760px){.project-list-head{display:none}.project-list-row{grid-template-columns:1fr auto;gap:5px}.project-list-description,.project-list-date{display:none}.project-inline-content{padding:0 8px 10px}.quick-task-create{grid-template-columns:1fr 1fr}.project-add-actions{gap:5px}}
