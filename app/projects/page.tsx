@@ -12,6 +12,7 @@ export default function ProjectsPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
@@ -42,7 +43,7 @@ export default function ProjectsPage() {
       const { data, error } = await supabase.from("projects").insert({ name: name.trim(), description: description.trim(), created_by: userId }).select("id,name,description,created_at").single();
       if (error) throw error;
       setProjects((current) => [data, ...current]);
-      setName(""); setDescription("");
+      setName(""); setDescription(""); setShowCreate(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Project could not be created.");
     } finally { setSaving(false); }
@@ -50,13 +51,13 @@ export default function ProjectsPage() {
 
   return <AppShell title="Projects" subtitle="Shared team workspace">
     <section className="panel-box" style={{ padding: 20 }}>
-      <div className="section-header"><h3>Your projects</h3><span>{projects.length} projects</span></div>
-      {userId && <form onSubmit={createProject} className="task-form" style={{ marginBottom: 24 }}>
+      <div className="section-header"><div><h3>Your projects</h3><span>{projects.length} projects</span></div>{userId && <button type="button" className="primary-button" onClick={() => setShowCreate(v => !v)} style={{minWidth:42,fontSize:20}}>+</button>}</div>
+      {userId && showCreate && <form onSubmit={createProject} className="task-form" style={{ marginBottom: 24 }}>
         <div className="form-grid">
           <label>Project name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Website redesign" required /></label>
           <label>Short description<input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="What is this project about?" /></label>
         </div>
-        <div><button className="primary-button" disabled={saving}>{saving ? "Creating…" : "Create project"}</button></div>
+        <div style={{display:"flex",gap:8}}><button className="primary-button" disabled={saving}>{saving ? "Creating…" : "Create project"}</button><button type="button" className="secondary-button" onClick={() => setShowCreate(false)}>Cancel</button></div>
       </form>}
       {message && <p className="auth-status error">{message}</p>}
       {loading ? <p className="muted">Loading projects…</p> : projects.length === 0 ? <p className="muted">No projects to show yet.</p> :

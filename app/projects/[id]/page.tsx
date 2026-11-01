@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type Project = { id: string; name: string; description: string };
 type Section = { id: string; name: string; position: number };
-type Task = { id: string; section_id: string | null; title: string; description: string; start_date: string | null; due_date: string | null; is_done?: boolean; is_on_going?: boolean; progress?: string };
+type Task = { id: string; section_id: string | null; title: string; description: string; priority?: string; start_date: string | null; due_date: string | null; is_done?: boolean; is_on_going?: boolean; progress?: string };
 type Member = { user_id: string; can_view: boolean; can_create: boolean; can_edit: boolean; profiles?: { display_name: string; email: string } | null };
 type Profile = { id: string; display_name: string; email: string };
 
@@ -37,6 +37,15 @@ export default function ProjectDetailPage() {
   const [notice, setNotice] = useState("");
   const [canCreate, setCanCreate] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
+  const [showSectionForm, setShowSectionForm] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState<string | null>(null);
+  const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [taskTitle, setTaskTitle] = useState("");
+  const [taskDescription, setTaskDescription] = useState("");
+  const [taskPriority, setTaskPriority] = useState("medium");
+  const [taskStart, setTaskStart] = useState("");
+  const [taskDue, setTaskDue] = useState("");
+  const [subtaskTitle, setSubtaskTitle] = useState("");
 
   async function load() {
     try {
@@ -46,7 +55,7 @@ export default function ProjectDetailPage() {
       const [p, s, t, m, pr] = await Promise.all([
         supabase.from("projects").select("id,name,description").eq("id", projectId).single(),
         supabase.from("sections").select("id,name,position").eq("project_id", projectId).order("position"),
-        supabase.from("tasks").select("id,section_id,title,description,start_date,due_date,is_done,is_on_going").eq("project_id", projectId).order("created_at", { ascending: false }),
+        supabase.from("tasks").select("id,section_id,parent_task_id,title,description,priority,start_date,due_date,is_done,is_on_going,progress").eq("project_id", projectId).order("created_at", { ascending: false }),
         supabase.from("project_members").select("user_id,can_view,can_create,can_edit").eq("project_id", projectId),
         supabase.from("profiles").select("id,display_name,email")
       ]);
@@ -71,7 +80,7 @@ export default function ProjectDetailPage() {
       if (!user) throw new Error("Please sign in first.");
       const { error } = await supabase.from("sections").insert({ project_id: projectId, name: sectionName.trim(), position: sections.length, created_by: user.id });
       if (error) throw error;
-      setSectionName(""); await load();
+      setSectionName(""); setShowSectionForm(false); await load();
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not add section."); }
     finally { setBusy(false); }
   }
@@ -85,9 +94,26 @@ export default function ProjectDetailPage() {
       if (!user) throw new Error("Please sign in first.");
       const { error } = await supabase.from("tasks").insert({ project_id: projectId, section_id: sectionId, title, created_by: user.id });
       if (error) throw error;
-      setTaskDrafts((current) => ({ ...current, [sectionId]: "" })); await load();
+      setTaskDrafts((current) => ({ ...current, [sectionId]: "" })); setShowTaskForm(null); await load();
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not add task."); }
     finally { setBusy(false); }
+  }
+
+  function openTask(task: Task) { setActiveTask(task); setTaskTitle(task.title); setTaskDescription(task.description || ""); setTaskPriority(task.priority || "medium"); setTaskStart(task.start_date || ""); setTaskDue(task.due_date || ""); setSubtaskTitle(""); }
+
+  async function saveTask(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if (!activeTask || !taskTitle.trim()) return;
+    if (taskStart && taskDue && taskDue < taskStart) { setNotice("Due date must be on or after start date."); return; }
+    setBusy(true);
+    try { const supabase=createClient(); const {error}=await supabase.from("tasks").update({title:taskTitle.trim(),description:taskDescription,priority:taskPriority,start_date:taskStart||null,due_date:taskDue||null}).eq("id",activeTask.id); if(error) throw error; setActiveTask(null); await load(); }
+    catch(error){setNotice(error instanceof Error?error.message:"Could not save task.");} finally{setBusy(false);}
+  }
+
+  async function addSubtask(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault(); if(!activeTask || !subtaskTitle.trim()) return;
+    const supabase=createClient(); const {data:{user}}=await supabase.auth.getUser(); if(!user)return;
+    const {error}=await supabase.from("tasks").insert({project_id:projectId,section_id:activeTask.section_id,parent_task_id:activeTask.id,title:subtaskTitle.trim(),created_by:user.id});
+    if(error)setNotice(error.message); else {setSubtaskTitle(""); await load();}
   }
 
   async function setTaskFlag(task: Task, flag: "is_done" | "is_on_going") {
@@ -136,21 +162,38 @@ export default function ProjectDetailPage() {
         <p>{project.description || "Add tasks and organize work into sections below."}</p>
       </section>
       <section className="panel-box" style={{padding:20}}>
-        <div className="section-header"><h3>Sections and tasks</h3><span>{tasks.length} tasks</span></div>
+        <div className="section-header"><h3>Tasks</h3>{canCreate && <button type="button" className="primary-button" onClick={() => setShowSectionForm(v=>!v)} style={{minWidth:40,fontSize:20}}>+</button>}</div>
         {sections.map((section) => <div key={section.id} className="project-card" style={{marginBottom:14}}>
-          <div className="section-header"><h4>{section.name}</h4><span>{tasks.filter(t => t.section_id === section.id).length} tasks</span></div>
-          <div className="task-list">{tasks.filter(t => t.section_id === section.id).map(task => <div key={task.id} className="task-card" style={{cursor:"default"}}>
+          <div className="section-header"><h4>{section.name}</h4><button type="button" className="mini-button" onClick={() => setShowTaskForm(showTaskForm===section.id?null:section.id)}>+</button></div>
+          <div className="task-list">{tasks.filter(t => t.section_id === section.id).map(task => <div key={task.id} className="task-card" style={{cursor:"pointer"}} onClick={() => openTask(task)}>
             <div className="task-topline"><strong>{task.title}</strong><span className="status-badge">{getProgress(task)}</span></div>
             {task.description && <p>{task.description}</p>}
             <div className="task-footer"><span>Start: {task.start_date || "—"} · Due: {task.due_date || "—"}</span>
-              <div className="task-actions-inline"><button className="mini-button" onClick={() => void setTaskFlag(task,"is_on_going")}>{task.is_on_going ? "Clear on-going" : "On-going"}</button><button className="mini-button done" onClick={() => void setTaskFlag(task,"is_done")}>{task.is_done ? "Re-open" : "Done"}</button></div>
+              <div className="task-actions-inline" onClick={e=>e.stopPropagation()}><button className="mini-button" onClick={() => void setTaskFlag(task,"is_on_going")}>{task.is_on_going ? "Clear on-going" : "On-going"}</button><button className="mini-button done" onClick={() => void setTaskFlag(task,"is_done")}>{task.is_done ? "Re-open" : "Done"}</button></div>
             </div>
           </div>)}</div>
-          {canCreate && <form onSubmit={(e) => void addTask(e,section.id)} className="project-form" style={{marginTop:12,marginBottom:0}}><input value={taskDrafts[section.id] ?? ""} onChange={e => setTaskDrafts(c => ({...c,[section.id]:e.target.value}))} placeholder="Add a task to this section" /><button className="primary-button" disabled={busy}>Add task</button></form>}
+          {canCreate && showTaskForm===section.id && <form onSubmit={(e) => void addTask(e,section.id)} className="project-form" style={{marginTop:12,marginBottom:0}}><input value={taskDrafts[section.id] ?? ""} onChange={e => setTaskDrafts(c => ({...c,[section.id]:e.target.value}))} placeholder="Add a task to this section" /><button className="primary-button" disabled={busy}>Add task</button></form>}
         </div>)}
         {sections.length === 0 && <p className="muted">No sections yet. Create the first section to start organizing tasks.</p>}
-        {canCreate && <form onSubmit={(e) => void addSection(e)} className="project-form"><input value={sectionName} onChange={e => setSectionName(e.target.value)} placeholder="New section name" /><button className="primary-button" disabled={busy}>Add section</button></form>}
+        {canCreate && showSectionForm && <form onSubmit={(e) => void addSection(e)} className="project-form"><input value={sectionName} onChange={e => setSectionName(e.target.value)} placeholder="New section name" /><button className="primary-button" disabled={busy}>Add section</button></form>}
       </section>
+
+      {activeTask && <section className="panel-box" style={{padding:20,border:"1px solid #cbd5e1"}}>
+        <div className="section-header"><h3>Task details</h3><button type="button" className="secondary-button" onClick={()=>setActiveTask(null)}>Close</button></div>
+        <form onSubmit={e=>void saveTask(e)} className="task-form">
+          <label>Task name<input value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} required/></label>
+          <label>Description<textarea value={taskDescription} onChange={e=>setTaskDescription(e.target.value)} rows={4} placeholder="Task details and expected result"/></label>
+          <div className="form-grid">
+            <label>Priority<select value={taskPriority} onChange={e=>setTaskPriority(e.target.value)}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+            <label>Start date<input type="date" value={taskStart} onChange={e=>setTaskStart(e.target.value)}/></label>
+            <label>Due date<input type="date" min={taskStart||undefined} value={taskDue} onChange={e=>setTaskDue(e.target.value)}/></label>
+          </div>
+          <button className="primary-button" disabled={busy}>{busy?"Saving…":"Save task"}</button>
+        </form>
+        <div style={{marginTop:18}}><h4>Subtasks</h4>{tasks.filter(t=>t.parent_task_id===activeTask.id).map(t=><p key={t.id} className="muted">{t.title} · {getProgress(t)}</p>)}
+          {canCreate && <form onSubmit={e=>void addSubtask(e)} className="project-form"><input value={subtaskTitle} onChange={e=>setSubtaskTitle(e.target.value)} placeholder="New subtask"/><button className="secondary-button">Add subtask</button></form>}
+        </div>
+      </section>}
       <section className="panel-box" style={{padding:20}}>
         <div className="section-header"><h3>Project access</h3><span>Manage view, create and edit rights</span></div>
         <p className="muted">Only project administrators should manage access. Invite-by-email and member selection will be completed with the authentication invitation flow.</p>
