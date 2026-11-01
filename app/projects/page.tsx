@@ -18,7 +18,8 @@ export default function ProjectsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [expanded,setExpanded]=useState<string[]>([]);
   const [sectionMap,setSectionMap]=useState<Record<string,Section[]>>({});
-  const [taskMap,setTaskMap]=useState<Record<string,Task[]>>({});\n  const [assigneeMap,setAssigneeMap]=useState<Record<string,string[]>>({});
+  const [taskMap,setTaskMap]=useState<Record<string,Task[]>>({});
+  const [assigneeMap,setAssigneeMap]=useState<Record<string,string[]>>({});
 
   async function loadProjects() {
     try {
