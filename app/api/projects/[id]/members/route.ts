@@ -8,9 +8,10 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
 
+    const { data: project } = await userClient.from("projects").select("created_by").eq("id",params.id).maybeSingle();
     const { data: membership } = await userClient.from("project_members")
       .select("can_edit").eq("project_id", params.id).eq("user_id", user.id).maybeSingle();
-    if (!membership?.can_edit) return NextResponse.json({ error: "Only project admins can add members." }, { status: 403 });
+    if (!membership?.can_edit && project?.created_by !== user.id) return NextResponse.json({ error: "Only project admins can add members." }, { status: 403 });
 
     const body = await request.json();
     const email = String(body.email || "").trim().toLowerCase();

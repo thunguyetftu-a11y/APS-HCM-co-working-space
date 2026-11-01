@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { createClient } from "@/lib/supabase/client";
 
-type Project = { id: string; name: string; description: string };
+type Project = { id: string; name: string; description: string; created_by?: string };
 type Section = { id: string; name: string; position: number };
 type Task = { id: string; section_id: string | null; parent_task_id?: string | null; title: string; description: string; priority?: string; start_date: string | null; due_date: string | null; is_done?: boolean; is_on_going?: boolean; progress?: string };
 type Member = { user_id: string; can_view: boolean; can_create: boolean; can_edit: boolean; profiles?: { display_name: string; email: string } | null };
@@ -27,6 +27,7 @@ export default function ProjectDetailPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [taskAssigneeNames,setTaskAssigneeNames]=useState<Record<string,string[]>>({});
   const [members, setMembers] = useState<Member[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
@@ -63,7 +64,7 @@ export default function ProjectDetailPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setNotice("Please sign in to access this project."); return; }
       const [p, s, t, m, pr] = await Promise.all([
-        supabase.from("projects").select("id,name,description").eq("id", projectId).single(),
+        supabase.from("projects").select("id,name,description,created_by").eq("id", projectId).single(),
         supabase.from("sections").select("id,name,position").eq("project_id", projectId).order("position"),
         supabase.from("tasks").select("id,section_id,parent_task_id,title,description,priority,start_date,due_date,is_done,is_on_going,progress").eq("project_id", projectId).order("created_at", { ascending: false }),
         supabase.from("project_members").select("user_id,can_view,can_create,can_edit").eq("project_id", projectId),
@@ -73,8 +74,10 @@ export default function ProjectDetailPage() {
       if (s.error) throw s.error;
       if (t.error) throw t.error;
       setProject(p.data); setSections(s.data ?? []); setTasks(t.data ?? []);
+      const ids=(t.data??[]).map(task=>task.id); const {data:assigned}=ids.length?await supabase.from("task_assignees").select("task_id,user_id").in("task_id",ids):{data:[]};
+      const mapped:Record<string,string[]>={};(assigned??[]).forEach(row=>{const profile=(pr.data??[]).find(item=>item.id===row.user_id);if(profile)(mapped[row.task_id]||(mapped[row.task_id]=[])).push(profile.display_name||profile.email||"Member");});setTaskAssigneeNames(mapped);
       const mine = (m.data ?? []).find((member) => member.user_id === user.id);
-      setCanCreate(Boolean(mine?.can_create)); setCanEdit(Boolean(mine?.can_edit));
+      setCanCreate(Boolean(mine?.can_create)||p.data.created_by===user.id); setCanEdit(Boolean(mine?.can_edit)||p.data.created_by===user.id);
       setMembers(m.data ?? []); setProfiles((pr.data ?? []) as Profile[]);
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not load project."); }
   }
@@ -231,7 +234,7 @@ export default function ProjectDetailPage() {
           <div className="asana-task-table"><div className="asana-task-header"><span>Task name</span><span>Assignee</span><span>Start date</span><span>Due date</span><span>Priority</span><span>Attachment</span><span>Status</span></div>
             {tasks.filter(t=>t.section_id===section.id && !t.parent_task_id).map(task=><div key={task.id} className="asana-task-row">
               <button type="button" className="task-name-cell" onClick={()=>openTask(task)}><span className={task.is_done?"task-check checked":"task-check"}>{task.is_done?"✓":""}</span>{task.title}</button>
-              <span className="task-row-meta">Unassigned</span><span className="task-row-meta">{task.start_date||"—"}</span><span className="task-row-meta">{task.due_date||"—"}</span><span className={"priority priority-"+(task.priority||"medium")}>{task.priority||"medium"}</span><span className="task-row-meta">—</span>
+              <span className="task-row-meta">{(taskAssigneeNames[task.id]||[]).join(", ")||"Unassigned"}</span><span className="task-row-meta">{task.start_date||"—"}</span><span className="task-row-meta">{task.due_date||"—"}</span><span className={"priority priority-"+(task.priority||"medium")}>{task.priority||"medium"}</span><span className="task-row-meta">—</span>
               <span className="task-row-status"><button type="button" className="mini-button" onClick={()=>void setTaskFlag(task,"is_on_going")}>On-going</button><button type="button" className="mini-button done" onClick={()=>void setTaskFlag(task,"is_done")}>Done</button></span>
             </div>)}
             {canCreate && showTaskForm===section.id && <form className="asana-inline-task" onSubmit={e=>void addTask(e,section.id)}><span className="task-check"></span><input autoFocus value={taskDrafts[section.id]??""} onChange={e=>setTaskDrafts(v=>({...v,[section.id]:e.target.value}))} placeholder="Type task name and press Enter"/><button type="submit" disabled={busy}>Add</button><button type="button" className="row-cancel" onClick={()=>setShowTaskForm(null)}>×</button></form>}
