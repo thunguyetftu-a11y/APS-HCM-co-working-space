@@ -163,22 +163,21 @@ export default function ProjectDetailPage() {
       </section>
       <section className="panel-box" style={{padding:20}}>
         <div className="section-header"><h3>Tasks</h3>{canCreate && <button type="button" className="primary-button" onClick={() => setShowSectionForm(v=>!v)} style={{minWidth:40,fontSize:20}}>+</button>}</div>
-        {sections.map((section) => <div key={section.id} className="project-card" style={{marginBottom:14}}>
-          <div className="section-header"><h4>{section.name}</h4><button type="button" className="mini-button" onClick={() => setShowTaskForm(showTaskForm===section.id?null:section.id)}>+</button></div>
-          <div className="task-list">{tasks.filter(t => t.section_id === section.id).map(task => <div key={task.id} className="task-card" style={{cursor:"pointer"}} onClick={() => openTask(task)}>
-            <div className="task-topline"><strong>{task.title}</strong><span className="status-badge">{getProgress(task)}</span></div>
-            {task.description && <p>{task.description}</p>}
-            <div className="task-footer"><span>Start: {task.start_date || "—"} · Due: {task.due_date || "—"}</span>
-              <div className="task-actions-inline" onClick={e=>e.stopPropagation()}><button className="mini-button" onClick={() => void setTaskFlag(task,"is_on_going")}>{task.is_on_going ? "Clear on-going" : "On-going"}</button><button className="mini-button done" onClick={() => void setTaskFlag(task,"is_done")}>{task.is_done ? "Re-open" : "Done"}</button></div>
-            </div>
-          </div>)}</div>
-          {canCreate && showTaskForm===section.id && <form onSubmit={(e) => void addTask(e,section.id)} className="project-form" style={{marginTop:12,marginBottom:0}}><input value={taskDrafts[section.id] ?? ""} onChange={e => setTaskDrafts(c => ({...c,[section.id]:e.target.value}))} placeholder="Add a task to this section" /><button className="primary-button" disabled={busy}>Add task</button></form>}
-        </div>)}
-        {sections.length === 0 && <p className="muted">No sections yet. Create the first section to start organizing tasks.</p>}
-        {canCreate && showSectionForm && <form onSubmit={(e) => void addSection(e)} className="project-form"><input value={sectionName} onChange={e => setSectionName(e.target.value)} placeholder="New section name" /><button className="primary-button" disabled={busy}>Add section</button></form>}
+        {canCreate && showSectionForm && <form onSubmit={(e)=>void addSection(e)} className="inline-add-row"><input autoFocus value={sectionName} onChange={e=>setSectionName(e.target.value)} placeholder="New section name" onKeyDown={e=>{if(e.key==="Escape")setShowSectionForm(false);}}/><button type="submit" disabled={busy}>Add section</button><button type="button" className="row-cancel" onClick={()=>setShowSectionForm(false)}>Cancel</button></form>}
+        {sections.map(section => <div key={section.id} className="asana-section">
+          <div className="asana-section-heading"><span>⌄</span><strong>{section.name}</strong><span className="section-count">{tasks.filter(t=>t.section_id===section.id && !t.parent_task_id).length}</span><button type="button" className="row-plus" title="Add task" onClick={()=>setShowTaskForm(showTaskForm===section.id?null:section.id)}>+</button></div>
+          <div className="asana-task-table"><div className="asana-task-header"><span>Task name</span><span>Due date</span><span>Priority</span><span>Status</span></div>
+            {tasks.filter(t=>t.section_id===section.id && !t.parent_task_id).map(task=><div key={task.id} className="asana-task-row">
+              <button type="button" className="task-name-cell" onClick={()=>openTask(task)}><span className={task.is_done?"task-check checked":"task-check"}>{task.is_done?"✓":""}</span>{task.title}</button>
+              <span className="task-row-meta">{task.due_date||"—"}</span><span className={"priority priority-"+(task.priority||"medium")}>{task.priority||"medium"}</span>
+              <span className="task-row-status"><button type="button" className="mini-button" onClick={()=>void setTaskFlag(task,"is_on_going")}>On-going</button><button type="button" className="mini-button done" onClick={()=>void setTaskFlag(task,"is_done")}>Done</button></span>
+            </div>)}
+            {canCreate && showTaskForm===section.id && <form className="asana-inline-task" onSubmit={e=>void addTask(e,section.id)}><span className="task-check"></span><input autoFocus value={taskDrafts[section.id]??""} onChange={e=>setTaskDrafts(v=>({...v,[section.id]:e.target.value}))} placeholder="Type task name and press Enter"/><button type="submit" disabled={busy}>Add</button><button type="button" className="row-cancel" onClick={()=>setShowTaskForm(null)}>×</button></form>}
+          </div></div>) }
+        {sections.length===0 && <p className="muted">No sections yet. Create the first section to start organizing tasks.</p>}
       </section>
 
-      {activeTask && <section className="panel-box" style={{padding:20,border:"1px solid #cbd5e1"}}>
+      {activeTask && <div className="task-drawer-backdrop" onClick={()=>setActiveTask(null)}><section className="task-drawer" onClick={e=>e.stopPropagation()}>
         <div className="section-header"><h3>Task details</h3><button type="button" className="secondary-button" onClick={()=>setActiveTask(null)}>Close</button></div>
         <form onSubmit={e=>void saveTask(e)} className="task-form">
           <label>Task name<input value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} required/></label>
@@ -193,7 +192,7 @@ export default function ProjectDetailPage() {
         <div style={{marginTop:18}}><h4>Subtasks</h4>{tasks.filter(t=>t.parent_task_id===activeTask.id).map(t=><p key={t.id} className="muted">{t.title} · {getProgress(t)}</p>)}
           {canCreate && <form onSubmit={e=>void addSubtask(e)} className="project-form"><input value={subtaskTitle} onChange={e=>setSubtaskTitle(e.target.value)} placeholder="New subtask"/><button className="secondary-button">Add subtask</button></form>}
         </div>
-      </section>}
+      </section></div>}
       <section className="panel-box" style={{padding:20}}>
         <div className="section-header"><h3>Project access</h3><span>Manage view, create and edit rights</span></div>
         <p className="muted">Only project administrators should manage access. Invite-by-email and member selection will be completed with the authentication invitation flow.</p>
