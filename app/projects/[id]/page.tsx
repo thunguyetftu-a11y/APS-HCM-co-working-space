@@ -50,6 +50,9 @@ export default function ProjectDetailPage() {
   const [comments,setComments]=useState<any[]>([]);
   const [commentDraft,setCommentDraft]=useState("");
   const [attachments,setAttachments]=useState<any[]>([]);
+  const [mentionQuery,setMentionQuery]=useState<string|null>(null);
+  const [mentionStart,setMentionStart]=useState<number|null>(null);
+  const [selectedMentions,setSelectedMentions]=useState<string[]>([]);
 
   async function load() {
     try {
@@ -110,14 +113,34 @@ export default function ProjectDetailPage() {
     setAssigneeIds((a.data||[]).map(x=>x.user_id));setComments(b.data||[]);setAttachments(d.data||[]);
   }
   async function updateAssignees(ids:string[]) {
-    if(!activeTask)return;const db=createClient();const {error:delError}=await db.from("task_assignees").delete().eq("task_id",activeTask.id);
-    if(delError){setNotice(delError.message);return;}if(ids.length){const {error}=await db.from("task_assignees").insert(ids.map(user_id=>({task_id:activeTask.id,user_id})));if(error){setNotice(error.message);return;}}setAssigneeIds(ids);
+    if(!activeTask)return;
+    const db=createClient(); const previous=assigneeIds;
+    setAssigneeIds(ids); setNotice("");
+    const additions=ids.filter(id=>!previous.includes(id));
+    const removals=previous.filter(id=>!ids.includes(id));
+    if(additions.length){const {error}=await db.from("task_assignees").upsert(additions.map(user_id=>({task_id:activeTask.id,user_id})),{onConflict:"task_id,user_id"});if(error){setAssigneeIds(previous);setNotice("Could not assign member: "+error.message);return;}}
+    if(removals.length){const {error}=await db.from("task_assignees").delete().eq("task_id",activeTask.id).in("user_id",removals);if(error){setNotice("Could not remove member: "+error.message);return;}}
+  }
+  function handleCommentChange(value:string, cursor:number) {
+    setCommentDraft(value);
+    setSelectedMentions(ids=>ids.filter(id=>{const p=profiles.find(x=>x.id===id);return !!p && value.includes("@"+(p.display_name||p.email));}));
+    const before=value.slice(0,cursor); const match=before.match(/(?:^|\\s)@([^@\\s]*)$/);
+    if(match){setMentionQuery(match[1]);setMentionStart(cursor-match[1].length-1);}else{setMentionQuery(null);setMentionStart(null);}
+  }
+  function insertMention(profile:Profile) {
+    if(mentionStart===null)return;
+    const input=document.getElementById("task-comment-draft") as HTMLTextAreaElement|null;
+    const start=mentionStart; const end=input?.selectionStart??commentDraft.length;
+    const token="@"+(profile.display_name||profile.email);
+    const next=commentDraft.slice(0,start)+token+" "+commentDraft.slice(end);
+    setCommentDraft(next);setSelectedMentions(ids=>ids.includes(profile.id)?ids:[...ids,profile.id]);setMentionQuery(null);setMentionStart(null);
+    requestAnimationFrame(()=>{input?.focus();const pos=start+token.length+1;input?.setSelectionRange(pos,pos);});
   }
   async function postComment(e:React.FormEvent<HTMLFormElement>) {
     e.preventDefault();if(!activeTask||!commentDraft.trim())return;const {data:{user}}=await createClient().auth.getUser();if(!user)return;
-    const mentions=profiles.filter(p=>p.email&&commentDraft.toLowerCase().includes("@"+p.email.toLowerCase())).map(p=>p.id);
+    const mentions=selectedMentions.filter(id=>commentDraft.includes("@"+(profiles.find(p=>p.id===id)?.display_name||profiles.find(p=>p.id===id)?.email||"")));
     const {error}=await createClient().from("task_comments").insert({task_id:activeTask.id,author_id:user.id,body:commentDraft.trim(),mentions});
-    if(error)setNotice(error.message);else{setCommentDraft("");await openTask(activeTask);}
+    if(error)setNotice(error.message);else{setCommentDraft("");setSelectedMentions([]);await openTask(activeTask);}
   }
   async function uploadTaskAttachment(e:React.ChangeEvent<HTMLInputElement>) {
     const file=e.target.files?.[0];if(!file||!activeTask)return;const {data:{user}}=await createClient().auth.getUser();if(!user)return;
@@ -225,7 +248,7 @@ export default function ProjectDetailPage() {
 <div className="task-extra-grid">
           <section className="task-extra-block"><h4>Assignees</h4>{canEdit?<div className="assignee-options">{profiles.filter(p=>members.some(m=>m.user_id===p.id)).map(p=><label key={p.id}><input type="checkbox" checked={assigneeIds.includes(p.id)} onChange={e=>void updateAssignees(e.target.checked?[...assigneeIds,p.id]:assigneeIds.filter(id=>id!==p.id))}/>{p.display_name||p.email||"Team member"}</label>)}</div>:<p className="muted">{assigneeIds.length?assigneeIds.length+" assigned":"Not assigned"}</p>}</section>
           <section className="task-extra-block"><h4>Attachments</h4><div className="attachment-list">{attachments.map(file=><button type="button" className="attachment-item" key={file.id} onClick={()=>void openTaskAttachment(file.bucket_path)}>{file.file_name}</button>)}</div><label className="file-upload">＋ Attach file<input type="file" onChange={e=>void uploadTaskAttachment(e)}/></label></section>
-          <section className="task-extra-block"><h4>Comments &amp; @mentions</h4><div className="task-comments">{comments.map(comment=><article className="comment-item" key={comment.id}><div className="comment-meta"><strong>{profiles.find(p=>p.id===comment.author_id)?.display_name||"Team member"}</strong><span>{new Date(comment.created_at).toLocaleString()}</span></div><p>{comment.body}</p></article>)}</div><form className="comment-box" onSubmit={e=>void postComment(e)}><textarea value={commentDraft} onChange={e=>setCommentDraft(e.target.value)} placeholder="Write a comment… Use @email to mention a teammate"/><button className="primary-button" disabled={!commentDraft.trim()}>Comment</button></form></section>
+          <section className="task-extra-block"><h4>Comments &amp; @mentions</h4><div className="task-comments">{comments.map(comment=><article className="comment-item" key={comment.id}><div className="comment-meta"><strong>{profiles.find(p=>p.id===comment.author_id)?.display_name||"Team member"}</strong><span>{new Date(comment.created_at).toLocaleString()}</span></div><p>{comment.body}</p></article>)}</div><form className="comment-box" onSubmit={e=>void postComment(e)}><div className="mention-composer"><textarea id="task-comment-draft" value={commentDraft} onChange={e=>handleCommentChange(e.target.value,e.target.selectionStart)} onClick={e=>handleCommentChange(commentDraft,e.currentTarget.selectionStart)} placeholder="Write a comment… Type @ to mention a teammate"/>{mentionQuery!==null&&<div className="mention-suggestions">{profiles.filter(p=>members.some(m=>m.user_id===p.id)&&((p.display_name||p.email||"").toLowerCase().includes(mentionQuery.toLowerCase())||p.email?.toLowerCase().includes(mentionQuery.toLowerCase()))).slice(0,7).map(p=><button type="button" key={p.id} onMouseDown={e=>e.preventDefault()} onClick={()=>insertMention(p)}><strong>{p.display_name||p.email}</strong><small>{p.email}</small></button>)}</div>}</div><button className="primary-button" disabled={!commentDraft.trim()}>Comment</button></form></section>
         </div>        <div style={{marginTop:18}}><h4>Subtasks</h4>{tasks.filter(t=>t.parent_task_id===activeTask.id).map(t=><p key={t.id} className="muted">{t.title} · {getProgress(t)}</p>)}
           {canCreate && <form onSubmit={e=>void addSubtask(e)} className="project-form"><input value={subtaskTitle} onChange={e=>setSubtaskTitle(e.target.value)} placeholder="New subtask"/><button className="secondary-button">Add subtask</button></form>}
         </div>
