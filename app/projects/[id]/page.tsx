@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type Project = { id: string; name: string; description: string };
 type Section = { id: string; name: string; position: number };
-type Task = { id: string; section_id: string | null; title: string; description: string; priority?: string; start_date: string | null; due_date: string | null; is_done?: boolean; is_on_going?: boolean; progress?: string };
+type Task = { id: string; section_id: string | null; parent_task_id?: string | null; title: string; description: string; priority?: string; start_date: string | null; due_date: string | null; is_done?: boolean; is_on_going?: boolean; progress?: string };
 type Member = { user_id: string; can_view: boolean; can_create: boolean; can_edit: boolean; profiles?: { display_name: string; email: string } | null };
 type Profile = { id: string; display_name: string; email: string };
 
