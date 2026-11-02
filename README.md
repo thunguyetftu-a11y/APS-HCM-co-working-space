@@ -1,39 +1,26 @@
 # TeamFlow Planner
+A Next.js team project and task workspace with a Supabase backend foundation.
 
-A collaborative team planning app concept built as a responsive web app MVP for shared calendars, task boards, and work progress tracking.
+## Supabase setup
+1. Create a Supabase project.
+2. Run the full `supabase/schema.sql` file in Supabase SQL Editor.
+3. Copy the Project URL and publishable (or legacy anon) key from Project Settings → API.
+4. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to Vercel Preview and Production environment variables.
+5. Add the same values to a local `.env.local` file and redeploy.
 
-## Features
-- Shared workspace dashboard
-- Kanban task board
-- Project and assignee filters
-- Team calendar overview
-- Milestones and upcoming events
-- Real-time collaboration-ready UI design
-- Mobile responsive layout
+Never expose a Supabase service-role key in browser code or a `NEXT_PUBLIC_*` variable.
 
-## Tech stack
-- Next.js
-- React
-- TypeScript
-- CSS
+## Schema included
+Profiles, projects, project memberships and roles, sections, tasks, assignees, subtasks, task links, comments and mention IDs, attachment metadata, activity history, notifications, row-level security policies, and a private Storage bucket.
+
+Roles: viewer (read), creator (create sections/tasks), editor (create/edit content), admin (manage project and membership).
 
 ## Run locally
-
 ```bash
 npm install
 npm run dev
 ```
+Open http://localhost:3000.
 
-Then open:
-
-```text
-http://localhost:3000
-```
-
-## Project status
-This is a front-end MVP prototype designed to showcase a Microsoft Planner / Asana-style experience for teams working together in real time.
-
-
-## Interactive workspace update
-
-The workspace now provides project and section creation, task details, status rules, date pickers, multiple assignees, comments, activity history, follow-up task links, attachments, inbox, and a calendar. This version stores workspace data in browser localStorage and attachment data URLs for a single-browser prototype. It is not yet multi-user synchronized: connect a database, authentication provider, and object storage (for example Supabase) before deploying for real team collaboration. Sign-in is a demo flow and does not authenticate credentials.
+## Migration status
+This feature branch adds the Supabase database schema and authenticated client/session foundation. Existing screens still include localStorage-backed demo flows and must be migrated to Supabase queries and Supabase Auth before real multi-user collaboration is enabled. Test the SQL in a new Supabase project before production use.
